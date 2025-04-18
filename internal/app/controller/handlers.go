@@ -6,10 +6,10 @@ import (
 )
 
 type HTTPController struct {
-	service UrlService
+	service URLService
 }
 
-func NewHTTPController(service UrlService) *HTTPController {
+func NewHTTPController(service URLService) *HTTPController {
 	return &HTTPController{service: service}
 }
 
