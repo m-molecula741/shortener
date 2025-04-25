@@ -2,11 +2,14 @@ package usecase
 
 import (
 	"errors"
+	"path"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+const testBaseURL = "http://localhost:8080/"
 
 type MockURLStorage struct {
 	SaveFunc func(shortID, url string) error
@@ -32,7 +35,6 @@ func TestURLService_Shorten(t *testing.T) {
 		name    string
 		storage *MockURLStorage
 		url     string
-		want    string
 		wantErr bool
 	}{
 		{
@@ -61,6 +63,7 @@ func TestURLService_Shorten(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &URLService{
 				storage: tt.storage,
+				baseURL: testBaseURL,
 			}
 			got, err := s.Shorten(tt.url)
 			if (err != nil) != tt.wantErr {
@@ -68,8 +71,9 @@ func TestURLService_Shorten(t *testing.T) {
 				return
 			}
 			if !tt.wantErr {
-				assert.True(t, strings.HasPrefix(got, baseURL))
-				assert.Len(t, strings.TrimPrefix(got, baseURL), 8)
+				assert.True(t, strings.HasPrefix(got, testBaseURL))
+				_, shortID := path.Split(got)
+				assert.Len(t, shortID, 8)
 			}
 		})
 	}
@@ -111,6 +115,7 @@ func TestURLService_Expand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &URLService{
 				storage: tt.storage,
+				baseURL: testBaseURL,
 			}
 			got, err := s.Expand(tt.shortID)
 			if (err != nil) != tt.wantErr {

@@ -9,18 +9,21 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/m-molecula741/shortener/internal/app/config"
 	"github.com/m-molecula741/shortener/internal/app/controller"
 	"github.com/m-molecula741/shortener/internal/app/storage"
 	"github.com/m-molecula741/shortener/internal/app/usecase"
 )
 
 func main() {
+	cfg := config.NewConfig()
+
 	store := storage.NewInMemoryStorage()
-	service := usecase.NewURLService(store)
+	service := usecase.NewURLService(store, cfg.BaseURL)
 	controller := controller.NewHTTPController(service)
 
 	server := &http.Server{
-		Addr:    ":8080",
+		Addr:    cfg.ServerAddress,
 		Handler: controller,
 	}
 
@@ -28,7 +31,7 @@ func main() {
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("Сервер запущен на http://localhost%s\n", server.Addr)
+		log.Printf("Сервер запущен на http://%s\n", cfg.ServerAddress)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Ошибка запуска сервера: %v", err)
 		}

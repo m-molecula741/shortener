@@ -3,16 +3,23 @@ package usecase
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"strings"
 )
-
-const baseURL = "http://localhost:8080/"
 
 type URLService struct {
 	storage URLStorage
+	baseURL string
 }
 
-func NewURLService(storage URLStorage) *URLService {
-	return &URLService{storage: storage}
+func NewURLService(storage URLStorage, baseURL string) *URLService {
+	if !strings.HasSuffix(baseURL, "/") {
+		baseURL = baseURL + "/"
+	}
+
+	return &URLService{
+		storage: storage,
+		baseURL: baseURL,
+	}
 }
 
 func (s *URLService) Shorten(url string) (string, error) {
@@ -25,7 +32,7 @@ func (s *URLService) Shorten(url string) (string, error) {
 		return "", err
 	}
 
-	return baseURL + shortID, nil
+	return s.baseURL + shortID, nil
 }
 
 func (s *URLService) Expand(shortID string) (string, error) {
@@ -33,9 +40,9 @@ func (s *URLService) Expand(shortID string) (string, error) {
 }
 
 func generateShortID() (string, error) {
-    b := make([]byte, 6)
-    if _, err := rand.Read(b); err != nil {
-        return "", err
-    }
-    return base64.URLEncoding.EncodeToString(b)[:8], nil
+	b := make([]byte, 6)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b)[:8], nil
 }
