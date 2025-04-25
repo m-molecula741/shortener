@@ -3,25 +3,35 @@ package controller
 import (
 	"io"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 type HTTPController struct {
 	service URLService
+	router  *chi.Mux
 }
 
 func NewHTTPController(service URLService) *HTTPController {
-	return &HTTPController{service: service}
+	c := &HTTPController{
+		service: service,
+		router:  chi.NewRouter(),
+	}
+	c.setupRoutes()
+	return c
 }
 
-func (c *HTTPController) HandleRequest(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		c.handleShorten(w, r)
-	case http.MethodGet:
-		c.handleRedirect(w, r)
-	default:
-		http.Error(w, "Method not allowed", http.StatusBadRequest)
-	}
+func (c *HTTPController) setupRoutes() {
+	c.router.Use(middleware.Logger)
+	c.router.Use(middleware.Recoverer)
+
+	c.router.Post("/", c.handleShorten)
+	c.router.Get("/{shortID}", c.handleRedirect)
+}
+
+func (c *HTTPController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	c.router.ServeHTTP(w, r)
 }
 
 func (c *HTTPController) handleShorten(w http.ResponseWriter, r *http.Request) {
@@ -32,9 +42,9 @@ func (c *HTTPController) handleShorten(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(body) == 0 {
-        http.Error(w, "Bad request", http.StatusBadRequest)
-        return
-    }
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
 
 	shortURL, err := c.service.Shorten(string(body))
 	if err != nil {
@@ -48,7 +58,11 @@ func (c *HTTPController) handleShorten(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *HTTPController) handleRedirect(w http.ResponseWriter, r *http.Request) {
-	shortID := r.URL.Path[1:]
+	shortID := chi.URLParam(r, "shortID")
+	if shortID == "" {
+		shortID = r.URL.Path[1:]
+	}
+
 	originalURL, err := c.service.Expand(shortID)
 	if err != nil {
 		http.Error(w, "Not found", http.StatusBadRequest)
