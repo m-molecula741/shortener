@@ -51,7 +51,7 @@ func TestHTTPController_handleShorten(t *testing.T) {
 			},
 			requestBody:    "",
 			expectedStatus: http.StatusBadRequest,
-			expectedBody:   "Bad request\n",
+			expectedBody:   "Empty body\n",
 		},
 		{
 			name: "service error",
@@ -62,7 +62,7 @@ func TestHTTPController_handleShorten(t *testing.T) {
 			},
 			requestBody:    "https://example.com",
 			expectedStatus: http.StatusBadRequest,
-			expectedBody:   "Internal error\n",
+			expectedBody:   "Shorten failed\n",
 		},
 	}
 

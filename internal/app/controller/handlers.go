@@ -42,13 +42,13 @@ func (c *HTTPController) handleShorten(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(body) == 0 {
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		http.Error(w, "Empty body", http.StatusBadRequest)
 		return
 	}
 
 	shortURL, err := c.service.Shorten(string(body))
 	if err != nil {
-		http.Error(w, "Internal error", http.StatusBadRequest)
+		http.Error(w, "Shorten failed", http.StatusBadRequest)
 		return
 	}
 
