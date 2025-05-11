@@ -42,7 +42,7 @@ func (c *HTTPController) handleShorten(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(body) == 0 {
-		http.Error(w, "Empty body", http.StatusBadRequest)
+		http.Error(w, "Empty short url", http.StatusBadRequest)
 		return
 	}
 
@@ -65,7 +65,7 @@ func (c *HTTPController) handleRedirect(w http.ResponseWriter, r *http.Request) 
 
 	originalURL, err := c.service.Expand(shortID)
 	if err != nil {
-		http.Error(w, "Not found", http.StatusBadRequest)
+		http.Error(w, "Error expand short url", http.StatusBadRequest)
 		return
 	}
 
