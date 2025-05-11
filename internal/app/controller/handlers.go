@@ -1,0 +1,74 @@
+package controller
+
+import (
+	"io"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+)
+
+type HTTPController struct {
+	service URLService
+	router  *chi.Mux
+}
+
+func NewHTTPController(service URLService) *HTTPController {
+	c := &HTTPController{
+		service: service,
+		router:  chi.NewRouter(),
+	}
+	c.setupRoutes()
+	return c
+}
+
+func (c *HTTPController) setupRoutes() {
+	c.router.Use(middleware.Logger)
+	c.router.Use(middleware.Recoverer)
+
+	c.router.Post("/", c.handleShorten)
+	c.router.Get("/{shortID}", c.handleRedirect)
+}
+
+func (c *HTTPController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	c.router.ServeHTTP(w, r)
+}
+
+func (c *HTTPController) handleShorten(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	if len(body) == 0 {
+		http.Error(w, "Empty short url", http.StatusBadRequest)
+		return
+	}
+
+	shortURL, err := c.service.Shorten(string(body))
+	if err != nil {
+		http.Error(w, "Shorten failed", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte(shortURL))
+}
+
+func (c *HTTPController) handleRedirect(w http.ResponseWriter, r *http.Request) {
+	shortID := chi.URLParam(r, "shortID")
+	if shortID == "" {
+		shortID = r.URL.Path[1:]
+	}
+
+	originalURL, err := c.service.Expand(shortID)
+	if err != nil {
+		http.Error(w, "Error expand short url", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Location", originalURL)
+	w.WriteHeader(http.StatusTemporaryRedirect)
+}
