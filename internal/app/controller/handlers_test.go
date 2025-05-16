@@ -2,12 +2,14 @@ package controller
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type MockURLService struct {
@@ -124,6 +126,65 @@ func TestHTTPController_handleRedirect(t *testing.T) {
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 			assert.Equal(t, tt.expectedLoc, w.Header().Get("Location"))
+		})
+	}
+}
+
+func TestHandleShortenJSON(t *testing.T) {
+	tests := []struct {
+		name           string
+		request        ShortenRequest
+		mockResponse   string
+		mockError      error
+		expectedStatus int
+		expectedResult string
+	}{
+		{
+			name: "успешное сокращение URL",
+			request: ShortenRequest{
+				URL: "https://practicum.yandex.ru",
+			},
+			mockResponse:   "http://localhost:8080/abc123",
+			mockError:      nil,
+			expectedStatus: http.StatusCreated,
+			expectedResult: "http://localhost:8080/abc123",
+		},
+		{
+			name: "пустой URL",
+			request: ShortenRequest{
+				URL: "",
+			},
+			expectedStatus: http.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := &MockURLService{
+				ShortenFunc: func(url string) (string, error) {
+					return tt.mockResponse, tt.mockError
+				},
+			}
+
+			controller := NewHTTPController(mockService)
+
+			reqBody, err := json.Marshal(tt.request)
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewBuffer(reqBody))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			controller.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.expectedStatus == http.StatusCreated {
+				var response ShortenResponse
+				err = json.NewDecoder(w.Body).Decode(&response)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedResult, response.Result)
+			}
 		})
 	}
 }

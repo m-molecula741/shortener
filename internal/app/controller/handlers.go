@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 
@@ -22,12 +23,21 @@ func NewHTTPController(service URLService) *HTTPController {
 	return c
 }
 
+type ShortenRequest struct {
+	URL string `json:"url"`
+}
+
+type ShortenResponse struct {
+	Result string `json:"result"`
+}
+
 func (c *HTTPController) setupRoutes() {
 	c.router.Use(middleware.Logger)
 	c.router.Use(middleware.Recoverer)
 
 	c.router.Post("/", c.handleShorten)
 	c.router.Get("/{shortID}", c.handleRedirect)
+	c.router.Post("/api/shorten", c.handleShortenJSON)
 }
 
 func (c *HTTPController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -71,4 +81,32 @@ func (c *HTTPController) handleRedirect(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func (c *HTTPController) handleShortenJSON(w http.ResponseWriter, r *http.Request) {
+	var req ShortenRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.URL == "" {
+		http.Error(w, "URL is required", http.StatusBadRequest)
+		return
+	}
+
+	shortURL, err := c.service.Shorten(req.URL)
+	if err != nil {
+		http.Error(w, "Shorten failed", http.StatusInternalServerError)
+		return
+	}
+
+	response := ShortenResponse{
+		Result: shortURL,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(response)
 }
