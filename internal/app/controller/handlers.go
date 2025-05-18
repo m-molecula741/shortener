@@ -6,7 +6,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	appmiddleware "github.com/m-molecula741/shortener/internal/app/middleware"
 )
 
 type HTTPController struct {
@@ -32,8 +33,9 @@ type ShortenResponse struct {
 }
 
 func (c *HTTPController) setupRoutes() {
-	c.router.Use(middleware.Logger)
-	c.router.Use(middleware.Recoverer)
+	c.router.Use(chimiddleware.Logger)
+	c.router.Use(chimiddleware.Recoverer)
+	c.router.Use(appmiddleware.GzipMiddleware)
 
 	c.router.Post("/", c.handleShorten)
 	c.router.Get("/{shortID}", c.handleRedirect)
@@ -62,7 +64,7 @@ func (c *HTTPController) handleShorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
 }
@@ -75,11 +77,13 @@ func (c *HTTPController) handleRedirect(w http.ResponseWriter, r *http.Request) 
 
 	originalURL, err := c.service.Expand(shortID)
 	if err != nil {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		http.Error(w, "Error expand short url", http.StatusBadRequest)
 		return
 	}
 
 	w.Header().Set("Location", originalURL)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
