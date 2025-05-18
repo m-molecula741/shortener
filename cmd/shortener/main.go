@@ -20,7 +20,15 @@ func main() {
 
 	cfg := config.NewConfig()
 
-	store := storage.NewInMemoryStorage()
+	// Инициализируем хранилище с поддержкой файла
+	store, err := storage.NewInMemoryStorage(cfg.StorageFilePath)
+	if err != nil {
+		logger.Info().
+			Err(err).
+			Msg("Failed to initialize storage")
+		os.Exit(1)
+	}
+
 	service := usecase.NewURLService(store, cfg.BaseURL)
 	controller := controller.NewHTTPController(service)
 
@@ -46,6 +54,13 @@ func main() {
 
 	<-done
 	logger.Info().Msg("Server is shutting down...")
+
+	// Сохраняем данные перед выключением
+	if err := store.Backup(); err != nil {
+		logger.Info().
+			Err(err).
+			Msg("Failed to backup storage")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

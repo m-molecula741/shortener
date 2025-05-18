@@ -2,24 +2,43 @@ package storage
 
 import (
 	"errors"
+	"fmt"
 	"sync"
+	"sync/atomic"
 )
 
 type InMemoryStorage struct {
-	mu   sync.Mutex
-	urls map[string]string
+	mu      sync.Mutex
+	urls    map[string]string
+	backup  *FileBackup
+	counter uint64
 }
 
-func NewInMemoryStorage() *InMemoryStorage {
-	return &InMemoryStorage{
-		urls: make(map[string]string),
+func NewInMemoryStorage(filePath string) (*InMemoryStorage, error) {
+	backup := NewFileBackup(filePath)
+
+	// Создаем хранилище
+	s := &InMemoryStorage{
+		urls:   make(map[string]string),
+		backup: backup,
 	}
+
+	// Загружаем существующие URL из файла
+	if urls, err := backup.LoadURLs(); err != nil {
+		return nil, err
+	} else {
+		s.urls = urls
+	}
+
+	return s, nil
 }
 
 func (s *InMemoryStorage) Save(shortID, url string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	s.urls[shortID] = url
+	atomic.AddUint64(&s.counter, 1)
 	return nil
 }
 
@@ -31,6 +50,28 @@ func (s *InMemoryStorage) Get(shortID string) (string, error) {
 		return "", ErrNotFound
 	}
 	return url, nil
+}
+
+// Backup сохраняет все URL в файл
+func (s *InMemoryStorage) Backup() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Очищаем файл перед сохранением
+	if err := s.backup.Clear(); err != nil {
+		return fmt.Errorf("cannot clear backup file: %w", err)
+	}
+
+	// Сохраняем все URL
+	id := uint64(1)
+	for shortID, url := range s.urls {
+		if err := s.backup.SaveURL(fmt.Sprintf("%d", id), shortID, url); err != nil {
+			return fmt.Errorf("cannot backup URL: %w", err)
+		}
+		id++
+	}
+
+	return nil
 }
 
 var (
