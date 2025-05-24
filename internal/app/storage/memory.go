@@ -4,14 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
+
+	"github.com/google/uuid"
 )
 
 type InMemoryStorage struct {
-	mu      sync.Mutex
-	urls    map[string]string
-	backup  *FileBackup
-	counter uint64
+	mu     sync.Mutex
+	urls   map[string]string
+	backup *FileBackup
 }
 
 func NewInMemoryStorage(filePath string) (*InMemoryStorage, error) {
@@ -38,7 +38,6 @@ func (s *InMemoryStorage) Save(shortID, url string) error {
 	defer s.mu.Unlock()
 
 	s.urls[shortID] = url
-	atomic.AddUint64(&s.counter, 1)
 	return nil
 }
 
@@ -63,12 +62,11 @@ func (s *InMemoryStorage) Backup() error {
 	}
 
 	// Сохраняем все URL
-	id := uint64(1)
 	for shortID, url := range s.urls {
-		if err := s.backup.SaveURL(fmt.Sprintf("%d", id), shortID, url); err != nil {
+		uuid := uuid.New().String()
+		if err := s.backup.SaveURL(uuid, shortID, url); err != nil {
 			return fmt.Errorf("cannot backup URL: %w", err)
 		}
-		id++
 	}
 
 	return nil

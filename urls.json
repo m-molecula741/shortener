@@ -1,21 +1,42 @@
 [
-{"uuid":"1","short_url":"jxuisHmv","original_url":"https://practicum.yandex.ru/"}
-,
-{"uuid":"2","short_url":"kgcSlkza","original_url":"https://practicum.yandex.ru/"}
-,
-{"uuid":"3","short_url":"yLe7kLsm","original_url":"https://practicum.yandex.ru/"}
-,
-{"uuid":"4","short_url":"RwCvKtok","original_url":"https://practicum.yandex.ru/"}
-,
-{"uuid":"5","short_url":"6VFgXPcR","original_url":"https://practicum.yandex.ru/"}
-,
-{"uuid":"6","short_url":"LMkAlPSv","original_url":"https://practicum.yandex.ru/"}
-,
-{"uuid":"7","short_url":"yXVikV7y","original_url":"https://practicum.yandex.ru/"}
-,
-{"uuid":"8","short_url":"Ux7vrhAS","original_url":"https://practicum.yandex.ru/"}
-,
-{"uuid":"9","short_url":"wsy4eTrF","original_url":"https://practicum.yandex.ru/"}
-,
-{"uuid":"10","short_url":"LnG3MygA","original_url":"https://practicum.yandex.ru/"}
+  {
+    "uuid": "f3330c52-c3ec-4b86-805b-7612431fd56f",
+    "short_url": "Sb0F9jGX",
+    "original_url": "http://test.ru"
+  },
+  {
+    "uuid": "c456af2f-be1d-4948-9e83-3022b2b0ad67",
+    "short_url": "Ho2dWt3k",
+    "original_url": "http://test.ru"
+  },
+  {
+    "uuid": "93dca439-6b55-40ff-9693-42ee784c9257",
+    "short_url": "2P8kGis1",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "ceffb26f-9736-4b80-89b4-6636bb620856",
+    "short_url": "GAFVL0NV",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "685da621-f697-4977-803b-78a41d682b44",
+    "short_url": "Rvnpu5RL",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "20ae4d6b-eadc-41e6-be05-d517d47bd842",
+    "short_url": "a_JUcG7q",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "46466e73-f561-47ef-8581-30e1884bdd3c",
+    "short_url": "bSLovoxS",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "39f7c81d-a027-4787-871a-d46dea9c4e86",
+    "short_url": "iixDo7yG",
+    "original_url": "http://test.ru"
+  }
 ]
