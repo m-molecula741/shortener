@@ -56,15 +56,10 @@ func (s *InMemoryStorage) Backup() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Очищаем файл перед сохранением
-	if err := s.backup.Clear(); err != nil {
-		return fmt.Errorf("cannot clear backup file: %w", err)
-	}
-
 	// Сохраняем все URL
 	for shortID, url := range s.urls {
-		uuid := uuid.New().String()
-		if err := s.backup.SaveURL(uuid, shortID, url); err != nil {
+		// Генерируем UUID только для новых записей, если запись уже есть в файле - используем существующий UUID
+		if err := s.backup.SaveURL(uuid.New().String(), shortID, url); err != nil {
 			return fmt.Errorf("cannot backup URL: %w", err)
 		}
 	}

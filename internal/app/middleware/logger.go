@@ -1,8 +1,9 @@
-package logger
+package middleware
 
 import (
 	"net/http"
 	"time"
+	"github.com/m-molecula741/shortener/internal/app/logger"
 )
 
 type responseWriter struct {
@@ -36,7 +37,7 @@ func RequestLogger(next http.Handler) http.Handler {
 		next.ServeHTTP(wrapped, r)
 
 		// Логируем информацию о запросе и ответе
-		Info().
+		logger.Info().
 			Str("method", r.Method).
 			Str("uri", r.RequestURI).
 			Int("status", wrapped.status).

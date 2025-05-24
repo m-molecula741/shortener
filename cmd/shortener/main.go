@@ -13,6 +13,7 @@ import (
 	"github.com/m-molecula741/shortener/internal/app/logger"
 	"github.com/m-molecula741/shortener/internal/app/storage"
 	"github.com/m-molecula741/shortener/internal/app/usecase"
+	"github.com/m-molecula741/shortener/internal/app/middleware"
 )
 
 func main() {
@@ -34,7 +35,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:    cfg.ServerAddress,
-		Handler: logger.RequestLogger(controller),
+		Handler: middleware.RequestLogger(controller),
 	}
 
 	done := make(chan os.Signal, 1)

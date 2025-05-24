@@ -14,29 +14,40 @@ type URLRecord struct {
 
 type FileBackup struct {
 	filePath string
-	records  []URLRecord
+	records  map[string]URLRecord // ключ - shortURL для быстрого поиска существующих записей
 }
 
 func NewFileBackup(filePath string) *FileBackup {
 	return &FileBackup{
 		filePath: filePath,
-		records:  make([]URLRecord, 0),
+		records:  make(map[string]URLRecord),
 	}
 }
 
 func (fb *FileBackup) Clear() error {
-	fb.records = make([]URLRecord, 0)
+	fb.records = make(map[string]URLRecord)
 	return nil
 }
 
 // SaveURL сохраняет URL в память
 func (fb *FileBackup) SaveURL(uuid, shortURL, originalURL string) error {
-	record := URLRecord{
-		UUID:        uuid,
-		ShortURL:    shortURL,
-		OriginalURL: originalURL,
+	// Проверяем, существует ли уже запись с таким shortURL
+	if existingRecord, exists := fb.records[shortURL]; exists {
+		// Если URL изменился, обновляем его, сохраняя старый UUID
+		if existingRecord.OriginalURL != originalURL {
+			existingRecord.OriginalURL = originalURL
+			fb.records[shortURL] = existingRecord
+		}
+	} else {
+		// Создаем новую запись только для новых shortURL
+		record := URLRecord{
+			UUID:        uuid,
+			ShortURL:    shortURL,
+			OriginalURL: originalURL,
+		}
+		fb.records[shortURL] = record
 	}
-	fb.records = append(fb.records, record)
+
 	return fb.saveToFile()
 }
 
@@ -48,9 +59,15 @@ func (fb *FileBackup) saveToFile() error {
 	}
 	defer file.Close()
 
+	// Преобразуем map в slice для сохранения
+	records := make([]URLRecord, 0, len(fb.records))
+	for _, record := range fb.records {
+		records = append(records, record)
+	}
+
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ") // Добавляем отступы для читаемости
-	if err := encoder.Encode(fb.records); err != nil {
+	if err := encoder.Encode(records); err != nil {
 		return fmt.Errorf("cannot encode records: %w", err)
 	}
 
@@ -70,13 +87,20 @@ func (fb *FileBackup) LoadURLs() (map[string]string, error) {
 		return make(map[string]string), nil
 	}
 
-	if err := json.Unmarshal(data, &fb.records); err != nil {
+	var records []URLRecord
+	if err := json.Unmarshal(data, &records); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal records: %w", err)
 	}
 
+	// Сохраняем записи в память
+	for _, record := range records {
+		fb.records[record.ShortURL] = record
+	}
+
+	// Преобразуем в map для возврата
 	urls := make(map[string]string)
-	for _, record := range fb.records {
-		urls[record.ShortURL] = record.OriginalURL
+	for shortURL, record := range fb.records {
+		urls[shortURL] = record.OriginalURL
 	}
 
 	return urls, nil
