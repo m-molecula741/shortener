@@ -1,11 +1,13 @@
 package controller
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	appmiddleware "github.com/m-molecula741/shortener/internal/app/middleware"
 )
 
 type HTTPController struct {
@@ -22,12 +24,22 @@ func NewHTTPController(service URLService) *HTTPController {
 	return c
 }
 
+type ShortenRequest struct {
+	URL string `json:"url"`
+}
+
+type ShortenResponse struct {
+	Result string `json:"result"`
+}
+
 func (c *HTTPController) setupRoutes() {
-	c.router.Use(middleware.Logger)
-	c.router.Use(middleware.Recoverer)
+	c.router.Use(chimiddleware.Logger)
+	c.router.Use(chimiddleware.Recoverer)
+	c.router.Use(appmiddleware.GzipMiddleware)
 
 	c.router.Post("/", c.handleShorten)
 	c.router.Get("/{shortID}", c.handleRedirect)
+	c.router.Post("/api/shorten", c.handleShortenJSON)
 }
 
 func (c *HTTPController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -52,7 +64,7 @@ func (c *HTTPController) handleShorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
 }
@@ -65,10 +77,40 @@ func (c *HTTPController) handleRedirect(w http.ResponseWriter, r *http.Request) 
 
 	originalURL, err := c.service.Expand(shortID)
 	if err != nil {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		http.Error(w, "Error expand short url", http.StatusBadRequest)
 		return
 	}
 
 	w.Header().Set("Location", originalURL)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func (c *HTTPController) handleShortenJSON(w http.ResponseWriter, r *http.Request) {
+	var req ShortenRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.URL == "" {
+		http.Error(w, "URL is required", http.StatusBadRequest)
+		return
+	}
+
+	shortURL, err := c.service.Shorten(req.URL)
+	if err != nil {
+		http.Error(w, "Shorten failed", http.StatusInternalServerError)
+		return
+	}
+
+	response := ShortenResponse{
+		Result: shortURL,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(response)
 }
