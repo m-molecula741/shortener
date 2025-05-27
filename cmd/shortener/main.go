@@ -11,9 +11,9 @@ import (
 	"github.com/m-molecula741/shortener/internal/app/config"
 	"github.com/m-molecula741/shortener/internal/app/controller"
 	"github.com/m-molecula741/shortener/internal/app/logger"
+	"github.com/m-molecula741/shortener/internal/app/middleware"
 	"github.com/m-molecula741/shortener/internal/app/storage"
 	"github.com/m-molecula741/shortener/internal/app/usecase"
-	"github.com/m-molecula741/shortener/internal/app/middleware"
 )
 
 func main() {
@@ -30,12 +30,31 @@ func main() {
 		os.Exit(1)
 	}
 
-	service := usecase.NewURLService(store, cfg.BaseURL)
-	controller := controller.NewHTTPController(service)
+	// Проверяем, нужно ли подключение к БД
+	var dbPinger usecase.DatabasePinger
+	if cfg.DatabaseDSN != "" {
+		// Создаем подключение к PostgreSQL
+		db, err := storage.NewPostgresDB(cfg.DatabaseDSN)
+		if err != nil {
+			logger.Info().
+				Err(err).
+				Msg("Failed to connect to database")
+			os.Exit(1)
+		}
+
+		dbPinger = db
+		// Закрываем соединение при завершении
+		defer db.Close()
+
+		logger.Info().Msg("Database connection established")
+	}
+
+	service := usecase.NewURLService(store, cfg.BaseURL, dbPinger)
+	httpController := controller.NewHTTPController(service)
 
 	server := &http.Server{
 		Addr:    cfg.ServerAddress,
-		Handler: middleware.RequestLogger(controller),
+		Handler: middleware.RequestLogger(httpController),
 	}
 
 	done := make(chan os.Signal, 1)

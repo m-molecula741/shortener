@@ -12,17 +12,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// MockURLService мок для URLService
 type MockURLService struct {
 	ShortenFunc func(url string) (string, error)
 	ExpandFunc  func(shortID string) (string, error)
+	PingDBFunc  func() error
 }
 
 func (m *MockURLService) Shorten(url string) (string, error) {
-	return m.ShortenFunc(url)
+	if m.ShortenFunc != nil {
+		return m.ShortenFunc(url)
+	}
+	return "", nil
 }
 
 func (m *MockURLService) Expand(shortID string) (string, error) {
-	return m.ExpandFunc(shortID)
+	if m.ExpandFunc != nil {
+		return m.ExpandFunc(shortID)
+	}
+	return "", nil
+}
+
+func (m *MockURLService) PingDB() error {
+	if m.PingDBFunc != nil {
+		return m.PingDBFunc()
+	}
+	return nil
 }
 
 func TestHTTPController_handleShorten(t *testing.T) {
@@ -185,6 +200,45 @@ func TestHandleShortenJSON(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, tt.expectedResult, response.Result)
 			}
+		})
+	}
+}
+
+func TestHTTPController_handlePing(t *testing.T) {
+	tests := []struct {
+		name           string
+		service        URLService
+		expectedStatus int
+	}{
+		{
+			name: "успешный пинг базы данных",
+			service: &MockURLService{
+				PingDBFunc: func() error {
+					return nil
+				},
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "ошибка пинга базы данных",
+			service: &MockURLService{
+				PingDBFunc: func() error {
+					return errors.New("database connection failed")
+				},
+			},
+			expectedStatus: http.StatusInternalServerError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewHTTPController(tt.service)
+
+			req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+			w := httptest.NewRecorder()
+
+			c.handlePing(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
 		})
 	}
 }

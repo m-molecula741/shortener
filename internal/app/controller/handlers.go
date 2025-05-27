@@ -40,6 +40,7 @@ func (c *HTTPController) setupRoutes() {
 	c.router.Post("/", c.handleShorten)
 	c.router.Get("/{shortID}", c.handleRedirect)
 	c.router.Post("/api/shorten", c.handleShortenJSON)
+	c.router.Get("/ping", c.handlePing)
 }
 
 func (c *HTTPController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -113,4 +114,13 @@ func (c *HTTPController) handleShortenJSON(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(response)
+}
+
+func (c *HTTPController) handlePing(w http.ResponseWriter, r *http.Request) {
+	if err := c.service.PingDB(); err != nil {
+		http.Error(w, "Database connection failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
