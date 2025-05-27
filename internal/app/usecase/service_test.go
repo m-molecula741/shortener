@@ -30,6 +30,25 @@ func (m *MockURLStorage) Get(shortID string) (string, error) {
 	return "", errors.New("not implemented")
 }
 
+// MockDatabasePinger мок для DatabasePinger
+type MockDatabasePinger struct {
+	PingFunc  func() error
+	CloseFunc func()
+}
+
+func (m *MockDatabasePinger) Ping() error {
+	if m.PingFunc != nil {
+		return m.PingFunc()
+	}
+	return nil
+}
+
+func (m *MockDatabasePinger) Close() {
+	if m.CloseFunc != nil {
+		m.CloseFunc()
+	}
+}
+
 func TestURLService_Shorten(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -61,11 +80,8 @@ func TestURLService_Shorten(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &URLService{
-				storage: tt.storage,
-				baseURL: testBaseURL,
-			}
-			got, err := s.Shorten(tt.url)
+			service := NewURLService(tt.storage, testBaseURL, nil)
+			got, err := service.Shorten(tt.url)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("URLService.Shorten() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -113,11 +129,8 @@ func TestURLService_Expand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &URLService{
-				storage: tt.storage,
-				baseURL: testBaseURL,
-			}
-			got, err := s.Expand(tt.shortID)
+			service := NewURLService(tt.storage, testBaseURL, nil)
+			got, err := service.Expand(tt.shortID)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("URLService.Expand() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -145,4 +158,46 @@ func Test_generateShortID(t *testing.T) {
 
 		assert.NotEqual(t, id1, id2)
 	})
+}
+
+func TestURLService_PingDB(t *testing.T) {
+	tests := []struct {
+		name     string
+		dbPinger DatabasePinger
+		wantErr  bool
+	}{
+		{
+			name: "успешный пинг базы данных",
+			dbPinger: &MockDatabasePinger{
+				PingFunc: func() error {
+					return nil
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "ошибка пинга базы данных",
+			dbPinger: &MockDatabasePinger{
+				PingFunc: func() error {
+					return errors.New("connection failed")
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name:     "пингер не настроен (nil)",
+			dbPinger: nil,
+			wantErr:  false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			storage := &MockURLStorage{}
+			service := NewURLService(storage, testBaseURL, tt.dbPinger)
+
+			if err := service.PingDB(); (err != nil) != tt.wantErr {
+				t.Errorf("URLService.PingDB() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }

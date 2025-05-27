@@ -7,18 +7,20 @@ import (
 )
 
 type URLService struct {
-	storage URLStorage
-	baseURL string
+	storage  URLStorage
+	baseURL  string
+	dbPinger DatabasePinger
 }
 
-func NewURLService(storage URLStorage, baseURL string) *URLService {
+func NewURLService(storage URLStorage, baseURL string, dbPinger DatabasePinger) *URLService {
 	if !strings.HasSuffix(baseURL, "/") {
 		baseURL = baseURL + "/"
 	}
 
 	return &URLService{
-		storage: storage,
-		baseURL: baseURL,
+		storage:  storage,
+		baseURL:  baseURL,
+		dbPinger: dbPinger,
 	}
 }
 
@@ -45,4 +47,12 @@ func generateShortID() (string, error) {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(b)[:8], nil
+}
+
+// PingDB проверяет соединение с базой данных
+func (s *URLService) PingDB() error {
+	if s.dbPinger == nil {
+		return nil // если пингер не настроен, возвращаем nil
+	}
+	return s.dbPinger.Ping()
 }
