@@ -21,32 +21,38 @@ func main() {
 
 	cfg := config.NewConfig()
 
-	// Инициализируем хранилище с поддержкой файла
-	store, err := storage.NewInMemoryStorage(cfg.StorageFilePath)
-	if err != nil {
-		logger.Info().
-			Err(err).
-			Msg("Failed to initialize storage")
-		os.Exit(1)
-	}
-
-	// Проверяем, нужно ли подключение к БД
+	var store usecase.URLStorage
 	var dbPinger usecase.DatabasePinger
+
 	if cfg.DatabaseDSN != "" {
-		// Создаем подключение к PostgreSQL
-		db, err := storage.NewPostgresDB(cfg.DatabaseDSN)
+		// Используем PostgreSQL как основное хранилище
+		pgStorage, err := storage.NewPostgresStorage(cfg.DatabaseDSN)
 		if err != nil {
 			logger.Info().
 				Err(err).
-				Msg("Failed to connect to database")
+				Msg("Failed to initialize PostgreSQL storage")
 			os.Exit(1)
 		}
 
-		dbPinger = db
-		// Закрываем соединение при завершении
-		defer db.Close()
+		store = pgStorage
+		dbPinger = pgStorage // PostgreSQL поддерживает ping
 
-		logger.Info().Msg("Database connection established")
+		defer pgStorage.Close()
+
+		logger.Info().Msg("Using PostgreSQL storage")
+	} else {
+		fileStorage, err := storage.NewInMemoryStorage(cfg.StorageFilePath)
+		if err != nil {
+			logger.Info().
+				Err(err).
+				Msg("Failed to initialize file storage")
+			os.Exit(1)
+		}
+
+		store = fileStorage
+		dbPinger = nil // файловое хранилище не поддерживает ping
+
+		logger.Info().Msg("Using file storage")
 	}
 
 	service := usecase.NewURLService(store, cfg.BaseURL, dbPinger)
@@ -75,13 +81,7 @@ func main() {
 	<-done
 	logger.Info().Msg("Server is shutting down...")
 
-	// Сохраняем данные перед выключением
-	if err := store.Backup(); err != nil {
-		logger.Info().
-			Err(err).
-			Msg("Failed to backup storage")
-	}
-
+	// Graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -89,6 +89,14 @@ func main() {
 		logger.Info().
 			Err(err).
 			Msg("Server shutdown error")
+	}
+
+	if fileStorage, ok := store.(*storage.InMemoryStorage); ok {
+		if err := fileStorage.Backup(); err != nil {
+			logger.Info().
+				Err(err).
+				Msg("Failed to backup storage")
+		}
 	}
 
 	logger.Info().Msg("Server stopped")
