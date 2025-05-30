@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	appmiddleware "github.com/m-molecula741/shortener/internal/app/middleware"
+	"github.com/m-molecula741/shortener/internal/app/usecase"
 )
 
 type HTTPController struct {
@@ -40,6 +41,7 @@ func (c *HTTPController) setupRoutes() {
 	c.router.Post("/", c.handleShorten)
 	c.router.Get("/{shortID}", c.handleRedirect)
 	c.router.Post("/api/shorten", c.handleShortenJSON)
+	c.router.Post("/api/shorten/batch", c.handleShortenBatch)
 	c.router.Get("/ping", c.handlePing)
 }
 
@@ -123,4 +125,28 @@ func (c *HTTPController) handlePing(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (c *HTTPController) handleShortenBatch(w http.ResponseWriter, r *http.Request) {
+	var requests []usecase.BatchShortenRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if len(requests) == 0 {
+		http.Error(w, "Empty batch", http.StatusBadRequest)
+		return
+	}
+
+	responses, err := c.service.ShortenBatch(requests)
+	if err != nil {
+		http.Error(w, "Batch shorten failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(responses)
 }

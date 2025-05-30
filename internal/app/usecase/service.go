@@ -6,6 +6,22 @@ import (
 	"strings"
 )
 
+// Структуры для batch операций
+type URLPair struct {
+	ShortID     string
+	OriginalURL string
+}
+
+type BatchShortenRequest struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
+type BatchShortenResponse struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+}
+
 type URLService struct {
 	storage  URLStorage
 	baseURL  string
@@ -55,4 +71,39 @@ func (s *URLService) PingDB() error {
 		return nil // если пингер не настроен, возвращаем nil
 	}
 	return s.dbPinger.Ping()
+}
+
+// ShortenBatch сокращает множество URL за одну операцию
+func (s *URLService) ShortenBatch(requests []BatchShortenRequest) ([]BatchShortenResponse, error) {
+	if len(requests) == 0 {
+		return []BatchShortenResponse{}, nil
+	}
+
+	// Подготавливаем данные для batch сохранения
+	urlPairs := make([]URLPair, len(requests))
+	responses := make([]BatchShortenResponse, len(requests))
+
+	for i, req := range requests {
+		shortID, err := generateShortID()
+		if err != nil {
+			return nil, err
+		}
+
+		urlPairs[i] = URLPair{
+			ShortID:     shortID,
+			OriginalURL: req.OriginalURL,
+		}
+
+		responses[i] = BatchShortenResponse{
+			CorrelationID: req.CorrelationID,
+			ShortURL:      s.baseURL + shortID,
+		}
+	}
+
+	// Сохраняем все URL одной операцией
+	if err := s.storage.SaveBatch(urlPairs); err != nil {
+		return nil, err
+	}
+
+	return responses, nil
 }

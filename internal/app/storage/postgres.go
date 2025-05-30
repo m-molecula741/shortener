@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/m-molecula741/shortener/internal/app/usecase"
 )
 
 type PostgresStorage struct {
@@ -75,4 +76,40 @@ func (s *PostgresStorage) Ping() error {
 // Close закрывает соединение с базой данных (реализация DatabasePinger)
 func (s *PostgresStorage) Close() {
 	s.pool.Close()
+}
+
+// SaveBatch сохраняет множество URL за одну операцию в рамках транзакции
+func (s *PostgresStorage) SaveBatch(urls []usecase.URLPair) error {
+	if len(urls) == 0 {
+		return nil
+	}
+
+	// Начинаем транзакцию
+	tx, err := s.pool.Begin(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(context.Background()) // Откатываем транзакцию в случае ошибки
+
+	query := `
+		INSERT INTO urls (short_id, original_url) 
+		VALUES ($1, $2) 
+		ON CONFLICT (short_id) 
+		DO UPDATE SET original_url = EXCLUDED.original_url
+	`
+
+	// Выполняем все вставки в рамках одной транзакции
+	for _, url := range urls {
+		_, err := tx.Exec(context.Background(), query, url.ShortID, url.OriginalURL)
+		if err != nil {
+			return fmt.Errorf("failed to save URL %s: %w", url.ShortID, err)
+		}
+	}
+
+	// Коммитим транзакцию
+	if err := tx.Commit(context.Background()); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }
