@@ -2,8 +2,11 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/m-molecula741/shortener/internal/app/usecase"
 )
@@ -38,6 +41,7 @@ func (s *PostgresStorage) createTable() error {
 			original_url TEXT NOT NULL,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_urls_original_url ON urls(original_url);
 	`
 	_, err := s.pool.Exec(context.Background(), query)
 	return err
@@ -47,12 +51,26 @@ func (s *PostgresStorage) createTable() error {
 func (s *PostgresStorage) Save(shortID, url string) error {
 	query := `
 		INSERT INTO urls (short_id, original_url) 
-		VALUES ($1, $2) 
-		ON CONFLICT (short_id) 
-		DO UPDATE SET original_url = EXCLUDED.original_url
+		VALUES ($1, $2)
 	`
 	_, err := s.pool.Exec(context.Background(), query, shortID, url)
-	return err
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			// Если нарушение уникальности по original_url, находим существующий short_id
+			if pgErr.ConstraintName == "idx_urls_original_url" {
+				var existingShortID string
+				selectQuery := `SELECT short_id FROM urls WHERE original_url = $1`
+				err := s.pool.QueryRow(context.Background(), selectQuery, url).Scan(&existingShortID)
+				if err != nil {
+					return fmt.Errorf("failed to get existing short_id: %w", err)
+				}
+				return &usecase.ErrURLConflict{ExistingShortURL: existingShortID}
+			}
+		}
+		return err
+	}
+	return nil
 }
 
 // Get получает оригинальный URL по короткому ID (реализация URLStorage)
@@ -94,8 +112,7 @@ func (s *PostgresStorage) SaveBatch(urls []usecase.URLPair) error {
 	query := `
 		INSERT INTO urls (short_id, original_url) 
 		VALUES ($1, $2) 
-		ON CONFLICT (short_id) 
-		DO UPDATE SET original_url = EXCLUDED.original_url
+		ON CONFLICT (original_url) DO NOTHING
 	`
 
 	// Выполняем все вставки в рамках одной транзакции

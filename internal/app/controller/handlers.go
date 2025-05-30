@@ -63,6 +63,12 @@ func (c *HTTPController) handleShorten(w http.ResponseWriter, r *http.Request) {
 
 	shortURL, err := c.service.Shorten(string(body))
 	if err != nil {
+		if conflictErr, isConflict := usecase.IsURLConflict(err); isConflict {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(conflictErr.ExistingShortURL))
+			return
+		}
 		http.Error(w, "Shorten failed", http.StatusBadRequest)
 		return
 	}
@@ -105,6 +111,15 @@ func (c *HTTPController) handleShortenJSON(w http.ResponseWriter, r *http.Reques
 
 	shortURL, err := c.service.Shorten(req.URL)
 	if err != nil {
+		if conflictErr, isConflict := usecase.IsURLConflict(err); isConflict {
+			response := ShortenResponse{
+				Result: conflictErr.ExistingShortURL,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(response)
+			return
+		}
 		http.Error(w, "Shorten failed", http.StatusInternalServerError)
 		return
 	}

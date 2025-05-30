@@ -63,10 +63,12 @@ func (m *MockDatabasePinger) Close() {
 
 func TestURLService_Shorten(t *testing.T) {
 	tests := []struct {
-		name    string
-		storage *MockURLStorage
-		url     string
-		wantErr bool
+		name             string
+		storage          *MockURLStorage
+		url              string
+		wantErr          bool
+		wantConflict     bool
+		expectedShortURL string
 	}{
 		{
 			name: "успешное сокращение URL",
@@ -88,6 +90,18 @@ func TestURLService_Shorten(t *testing.T) {
 			url:     "https://example.com",
 			wantErr: true,
 		},
+		{
+			name: "конфликт URL - URL уже существует",
+			storage: &MockURLStorage{
+				SaveFunc: func(shortID, url string) error {
+					return &ErrURLConflict{ExistingShortURL: "existing123"}
+				},
+			},
+			url:              "https://example.com",
+			wantErr:          true,
+			wantConflict:     true,
+			expectedShortURL: testBaseURL + "existing123",
+		},
 	}
 
 	for _, tt := range tests {
@@ -98,7 +112,12 @@ func TestURLService_Shorten(t *testing.T) {
 				t.Errorf("URLService.Shorten() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !tt.wantErr {
+			if tt.wantConflict {
+				conflictErr, isConflict := IsURLConflict(err)
+				assert.True(t, isConflict)
+				assert.Equal(t, tt.expectedShortURL, conflictErr.ExistingShortURL)
+				assert.Equal(t, tt.expectedShortURL, got)
+			} else if !tt.wantErr {
 				assert.True(t, strings.HasPrefix(got, testBaseURL))
 				_, shortID := path.Split(got)
 				assert.Len(t, shortID, 8)

@@ -47,6 +47,11 @@ func (s *URLService) Shorten(url string) (string, error) {
 	}
 
 	if err := s.storage.Save(shortID, url); err != nil {
+		if conflictErr, isConflict := IsURLConflict(err); isConflict {
+			return s.baseURL + conflictErr.ExistingShortURL, &ErrURLConflict{
+				ExistingShortURL: s.baseURL + conflictErr.ExistingShortURL,
+			}
+		}
 		return "", err
 	}
 

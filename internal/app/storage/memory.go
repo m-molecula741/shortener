@@ -38,6 +38,13 @@ func (s *InMemoryStorage) Save(shortID, url string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Проверяем, есть ли уже такой URL
+	for existingShortID, existingURL := range s.urls {
+		if existingURL == url {
+			return &usecase.ErrURLConflict{ExistingShortURL: existingShortID}
+		}
+	}
+
 	s.urls[shortID] = url
 	return nil
 }

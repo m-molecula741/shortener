@@ -1,52 +1,7 @@
 [
   {
-    "uuid": "8390ffd8-803a-4330-8314-ee7b40584dc9",
-    "short_url": "fmX78fZZ",
-    "original_url": "https://practicum.yandex.ru/"
-  },
-  {
-    "uuid": "a73d5605-cf1c-4d5f-9a3f-ceab5587b98d",
-    "short_url": "o_KV9O7P",
-    "original_url": "https://stackoverflow.com"
-  },
-  {
-    "uuid": "dc96d092-e590-4723-9f8a-16a4a6d1dfd6",
-    "short_url": "86w8nMgo",
-    "original_url": "https://practicum.yandex.ru/"
-  },
-  {
-    "uuid": "66e04cf2-865f-4aba-9c16-9cb8d2b7da9d",
-    "short_url": "iPEDSnke",
-    "original_url": "https://practicum.yandex.ru/"
-  },
-  {
-    "uuid": "2f779e7f-7410-47b4-812a-8cf4d0d6a2b6",
-    "short_url": "1kmZbX4q",
-    "original_url": "https://practicum.yandex.ru/"
-  },
-  {
-    "uuid": "a141500a-7936-4fda-8926-aa504beef1d8",
-    "short_url": "ZBrmeTzd",
-    "original_url": "https://example.com"
-  },
-  {
     "uuid": "270a0f87-2cbb-4d27-8010-262fd12ec43d",
     "short_url": "cnd6Tk8L",
-    "original_url": "https://practicum.yandex.ru/"
-  },
-  {
-    "uuid": "8c3613cf-4f93-49fa-be80-22a62a8d90eb",
-    "short_url": "eXYNu4yM",
-    "original_url": "https://practicum.yandex.ru/"
-  },
-  {
-    "uuid": "d4d62da5-3a96-4d6f-a2a7-76209a203737",
-    "short_url": "s1rLp1fb",
-    "original_url": "https://github.com"
-  },
-  {
-    "uuid": "bee1e49f-03c7-419c-ba1c-7985bc40f228",
-    "short_url": "YIS-tWMi",
     "original_url": "https://practicum.yandex.ru/"
   },
   {
@@ -55,34 +10,9 @@
     "original_url": "https://practicum.yandex.ru/"
   },
   {
-    "uuid": "390dad85-33e3-4fca-8ab6-dc1c486311fb",
-    "short_url": "I2gop-Im",
-    "original_url": "https://practicum.yandex.ru/"
-  },
-  {
-    "uuid": "9a6d6ff1-c1f1-4aa0-804e-2b66074146eb",
-    "short_url": "dumVhQ-1",
-    "original_url": "https://practicum.yandex.ru/"
-  },
-  {
-    "uuid": "c12bb6c8-9af1-4ffe-826d-178bdd2fa335",
-    "short_url": "fYyYDpVl",
-    "original_url": "https://github.com"
-  },
-  {
-    "uuid": "74465808-5309-4dd7-a002-26ca3d895a67",
-    "short_url": "HeVyHpj8",
-    "original_url": "https://practicum.yandex.ru/"
-  },
-  {
     "uuid": "1127eea4-b94f-4e14-98a8-ac08843663fc",
     "short_url": "WHdBSeIW",
     "original_url": "https://practicum.yandex.ru/"
-  },
-  {
-    "uuid": "8f70d6c9-6924-487a-a058-8fe60e58053d",
-    "short_url": "Pt81Gh2P",
-    "original_url": "https://practicum.yandex.ru"
   },
   {
     "uuid": "268f0196-150d-46e9-a324-6860a74ac8fd",
@@ -92,11 +22,6 @@
   {
     "uuid": "c53df565-4194-4eea-aea8-56948365ab9a",
     "short_url": "mEZp252J",
-    "original_url": "https://practicum.yandex.ru/"
-  },
-  {
-    "uuid": "a3902bb7-35f8-46c3-a3aa-10c7f245cb94",
-    "short_url": "DDnE76va",
     "original_url": "https://practicum.yandex.ru/"
   },
   {
@@ -110,8 +35,13 @@
     "original_url": "https://practicum.yandex.ru/"
   },
   {
-    "uuid": "522f7253-3f84-4409-8446-76a066324941",
-    "short_url": "4wlB3L9x",
+    "uuid": "66e04cf2-865f-4aba-9c16-9cb8d2b7da9d",
+    "short_url": "iPEDSnke",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "fb32c270-c2be-49fc-9bf7-edcc36716da6",
+    "short_url": "84vThGVU",
     "original_url": "https://practicum.yandex.ru/"
   },
   {
@@ -120,8 +50,83 @@
     "original_url": "https://google.com"
   },
   {
-    "uuid": "fb32c270-c2be-49fc-9bf7-edcc36716da6",
-    "short_url": "84vThGVU",
+    "uuid": "8c3613cf-4f93-49fa-be80-22a62a8d90eb",
+    "short_url": "eXYNu4yM",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "d4d62da5-3a96-4d6f-a2a7-76209a203737",
+    "short_url": "s1rLp1fb",
+    "original_url": "https://github.com"
+  },
+  {
+    "uuid": "c12bb6c8-9af1-4ffe-826d-178bdd2fa335",
+    "short_url": "fYyYDpVl",
+    "original_url": "https://github.com"
+  },
+  {
+    "uuid": "a73d5605-cf1c-4d5f-9a3f-ceab5587b98d",
+    "short_url": "o_KV9O7P",
+    "original_url": "https://stackoverflow.com"
+  },
+  {
+    "uuid": "a141500a-7936-4fda-8926-aa504beef1d8",
+    "short_url": "ZBrmeTzd",
+    "original_url": "https://example.com"
+  },
+  {
+    "uuid": "bee1e49f-03c7-419c-ba1c-7985bc40f228",
+    "short_url": "YIS-tWMi",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "390dad85-33e3-4fca-8ab6-dc1c486311fb",
+    "short_url": "I2gop-Im",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "9a6d6ff1-c1f1-4aa0-804e-2b66074146eb",
+    "short_url": "dumVhQ-1",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "8f70d6c9-6924-487a-a058-8fe60e58053d",
+    "short_url": "Pt81Gh2P",
+    "original_url": "https://practicum.yandex.ru"
+  },
+  {
+    "uuid": "522f7253-3f84-4409-8446-76a066324941",
+    "short_url": "4wlB3L9x",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "da3fb546-0b53-4d80-b7d8-f7e23b03ace7",
+    "short_url": "EYP8vlxc",
+    "original_url": "https://newexample.com"
+  },
+  {
+    "uuid": "8390ffd8-803a-4330-8314-ee7b40584dc9",
+    "short_url": "fmX78fZZ",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "2f779e7f-7410-47b4-812a-8cf4d0d6a2b6",
+    "short_url": "1kmZbX4q",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "74465808-5309-4dd7-a002-26ca3d895a67",
+    "short_url": "HeVyHpj8",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "a3902bb7-35f8-46c3-a3aa-10c7f245cb94",
+    "short_url": "DDnE76va",
+    "original_url": "https://practicum.yandex.ru/"
+  },
+  {
+    "uuid": "dc96d092-e590-4723-9f8a-16a4a6d1dfd6",
+    "short_url": "86w8nMgo",
     "original_url": "https://practicum.yandex.ru/"
   }
 ]

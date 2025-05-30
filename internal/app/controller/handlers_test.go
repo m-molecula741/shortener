@@ -98,6 +98,19 @@ func TestHTTPController_handleShorten(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   "Shorten failed\n",
 		},
+		{
+			name: "URL conflict",
+			mockService: &MockURLService{
+				ShortenFunc: func(url string) (string, error) {
+					return "http://localhost:8080/existing123", &usecase.ErrURLConflict{
+						ExistingShortURL: "http://localhost:8080/existing123",
+					}
+				},
+			},
+			requestBody:    "https://example.com",
+			expectedStatus: http.StatusConflict,
+			expectedBody:   "http://localhost:8080/existing123",
+		},
 	}
 
 	for _, tt := range tests {
@@ -188,6 +201,18 @@ func TestHandleShortenJSON(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 		},
+		{
+			name: "конфликт URL",
+			request: ShortenRequest{
+				URL: "https://practicum.yandex.ru",
+			},
+			mockResponse: "http://localhost:8080/existing123",
+			mockError: &usecase.ErrURLConflict{
+				ExistingShortURL: "http://localhost:8080/existing123",
+			},
+			expectedStatus: http.StatusConflict,
+			expectedResult: "http://localhost:8080/existing123",
+		},
 	}
 
 	for _, tt := range tests {
@@ -211,7 +236,7 @@ func TestHandleShortenJSON(t *testing.T) {
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
-			if tt.expectedStatus == http.StatusCreated {
+			if tt.expectedStatus == http.StatusCreated || tt.expectedStatus == http.StatusConflict {
 				var response ShortenResponse
 				err = json.NewDecoder(w.Body).Decode(&response)
 				require.NoError(t, err)
