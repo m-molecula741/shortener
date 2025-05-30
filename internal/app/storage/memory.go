@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/m-molecula741/shortener/internal/app/usecase"
 )
 
 type InMemoryStorage struct {
@@ -70,3 +71,16 @@ func (s *InMemoryStorage) Backup() error {
 var (
 	ErrNotFound = errors.New("url not found")
 )
+
+// SaveBatch сохраняет множество URL за одну операцию
+func (s *InMemoryStorage) SaveBatch(urls []usecase.URLPair) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Сохраняем в память
+	for _, url := range urls {
+		s.urls[url.ShortID] = url.OriginalURL
+	}
+
+	return nil
+}
