@@ -97,17 +97,13 @@ func (s *PostgresStorage) Close() {
 }
 
 // SaveBatch сохраняет множество URL за одну операцию в рамках транзакции
-func (s *PostgresStorage) SaveBatch(urls []usecase.URLPair) error {
-	if len(urls) == 0 {
-		return nil
-	}
-
+func (s *PostgresStorage) SaveBatch(ctx context.Context, urls []usecase.URLPair) error {
 	// Начинаем транзакцию
-	tx, err := s.pool.Begin(context.Background())
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(context.Background()) // Откатываем транзакцию в случае ошибки
+	defer tx.Rollback(ctx) // Откатываем транзакцию в случае ошибки
 
 	query := `
 		INSERT INTO urls (short_id, original_url) 
@@ -117,14 +113,14 @@ func (s *PostgresStorage) SaveBatch(urls []usecase.URLPair) error {
 
 	// Выполняем все вставки в рамках одной транзакции
 	for _, url := range urls {
-		_, err := tx.Exec(context.Background(), query, url.ShortID, url.OriginalURL)
+		_, err := tx.Exec(ctx, query, url.ShortID, url.OriginalURL)
 		if err != nil {
 			return fmt.Errorf("failed to save URL %s: %w", url.ShortID, err)
 		}
 	}
 
 	// Коммитим транзакцию
-	if err := tx.Commit(context.Background()); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -80,7 +81,7 @@ var (
 )
 
 // SaveBatch сохраняет множество URL за одну операцию
-func (s *InMemoryStorage) SaveBatch(urls []usecase.URLPair) error {
+func (s *InMemoryStorage) SaveBatch(ctx context.Context, urls []usecase.URLPair) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

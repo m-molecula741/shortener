@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"path"
 	"strings"
@@ -14,7 +15,7 @@ const testBaseURL = "http://localhost:8080/"
 type MockURLStorage struct {
 	SaveFunc           func(shortID, url string) error
 	GetFunc            func(shortID string) (string, error)
-	SaveBatchFunc      func(urls []URLPair) error
+	SaveBatchFunc      func(ctx context.Context, urls []URLPair) error
 	SaveBatchCallCount int
 	LastSavedBatch     []URLPair
 }
@@ -33,11 +34,11 @@ func (m *MockURLStorage) Get(shortID string) (string, error) {
 	return "", errors.New("not implemented")
 }
 
-func (m *MockURLStorage) SaveBatch(urls []URLPair) error {
+func (m *MockURLStorage) SaveBatch(ctx context.Context, urls []URLPair) error {
 	m.SaveBatchCallCount++
 	m.LastSavedBatch = urls
 	if m.SaveBatchFunc != nil {
-		return m.SaveBatchFunc(urls)
+		return m.SaveBatchFunc(ctx, urls)
 	}
 	return nil
 }
@@ -260,7 +261,7 @@ func TestURLService_ShortenBatch(t *testing.T) {
 	tests := []struct {
 		name                string
 		requests            []BatchShortenRequest
-		mockSaveBatchFunc   func(urls []URLPair) error
+		mockSaveBatchFunc   func(ctx context.Context, urls []URLPair) error
 		wantErr             bool
 		expectedCallCount   int
 		expectedBatchLength int
@@ -272,7 +273,7 @@ func TestURLService_ShortenBatch(t *testing.T) {
 				{CorrelationID: "2", OriginalURL: "https://google.com"},
 				{CorrelationID: "3", OriginalURL: "https://github.com"},
 			},
-			mockSaveBatchFunc: func(urls []URLPair) error {
+			mockSaveBatchFunc: func(ctx context.Context, urls []URLPair) error {
 				return nil
 			},
 			wantErr:             false,
@@ -292,7 +293,7 @@ func TestURLService_ShortenBatch(t *testing.T) {
 			requests: []BatchShortenRequest{
 				{CorrelationID: "1", OriginalURL: "https://example.com"},
 			},
-			mockSaveBatchFunc: func(urls []URLPair) error {
+			mockSaveBatchFunc: func(ctx context.Context, urls []URLPair) error {
 				return errors.New("storage error")
 			},
 			wantErr:             true,
@@ -308,7 +309,7 @@ func TestURLService_ShortenBatch(t *testing.T) {
 			}
 			service := NewURLService(mockStorage, "http://localhost:8080/", nil)
 
-			responses, err := service.ShortenBatch(tt.requests)
+			responses, err := service.ShortenBatch(context.Background(), tt.requests)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("URLService.ShortenBatch() error = %v, wantErr %v", err, tt.wantErr)

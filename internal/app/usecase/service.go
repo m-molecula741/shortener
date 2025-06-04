@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"strings"
@@ -79,7 +80,7 @@ func (s *URLService) PingDB() error {
 }
 
 // ShortenBatch сокращает множество URL за одну операцию
-func (s *URLService) ShortenBatch(requests []BatchShortenRequest) ([]BatchShortenResponse, error) {
+func (s *URLService) ShortenBatch(ctx context.Context, requests []BatchShortenRequest) ([]BatchShortenResponse, error) {
 	if len(requests) == 0 {
 		return []BatchShortenResponse{}, nil
 	}
@@ -106,7 +107,7 @@ func (s *URLService) ShortenBatch(requests []BatchShortenRequest) ([]BatchShorte
 	}
 
 	// Сохраняем все URL одной операцией
-	if err := s.storage.SaveBatch(urlPairs); err != nil {
+	if err := s.storage.SaveBatch(ctx, urlPairs); err != nil {
 		return nil, err
 	}
 

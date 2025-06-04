@@ -155,7 +155,7 @@ func (c *HTTPController) handleShortenBatch(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	responses, err := c.service.ShortenBatch(requests)
+	responses, err := c.service.ShortenBatch(r.Context(), requests)
 	if err != nil {
 		http.Error(w, "Batch shorten failed", http.StatusInternalServerError)
 		return

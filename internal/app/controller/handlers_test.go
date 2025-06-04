@@ -2,6 +2,7 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -18,7 +19,7 @@ type MockURLService struct {
 	ShortenFunc      func(url string) (string, error)
 	ExpandFunc       func(shortID string) (string, error)
 	PingDBFunc       func() error
-	ShortenBatchFunc func(requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error)
+	ShortenBatchFunc func(ctx context.Context, requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error)
 }
 
 func (m *MockURLService) Shorten(url string) (string, error) {
@@ -42,9 +43,9 @@ func (m *MockURLService) PingDB() error {
 	return nil
 }
 
-func (m *MockURLService) ShortenBatch(requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error) {
+func (m *MockURLService) ShortenBatch(ctx context.Context, requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error) {
 	if m.ShortenBatchFunc != nil {
-		return m.ShortenBatchFunc(requests)
+		return m.ShortenBatchFunc(ctx, requests)
 	}
 
 	responses := make([]usecase.BatchShortenResponse, len(requests))
@@ -302,7 +303,7 @@ func TestHTTPController_handleShortenBatch(t *testing.T) {
 				{CorrelationID: "2", OriginalURL: "https://google.com"},
 			},
 			mockService: &MockURLService{
-				ShortenBatchFunc: func(requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error) {
+				ShortenBatchFunc: func(ctx context.Context, requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error) {
 					responses := make([]usecase.BatchShortenResponse, len(requests))
 					for i, req := range requests {
 						responses[i] = usecase.BatchShortenResponse{
@@ -336,7 +337,7 @@ func TestHTTPController_handleShortenBatch(t *testing.T) {
 				{CorrelationID: "1", OriginalURL: "https://example.com"},
 			},
 			mockService: &MockURLService{
-				ShortenBatchFunc: func(requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error) {
+				ShortenBatchFunc: func(ctx context.Context, requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error) {
 					return nil, errors.New("service error")
 				},
 			},
