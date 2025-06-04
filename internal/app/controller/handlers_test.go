@@ -2,27 +2,60 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/m-molecula741/shortener/internal/app/usecase"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// MockURLService мок для URLService
 type MockURLService struct {
-	ShortenFunc func(url string) (string, error)
-	ExpandFunc  func(shortID string) (string, error)
+	ShortenFunc      func(url string) (string, error)
+	ExpandFunc       func(shortID string) (string, error)
+	PingDBFunc       func() error
+	ShortenBatchFunc func(ctx context.Context, requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error)
 }
 
 func (m *MockURLService) Shorten(url string) (string, error) {
-	return m.ShortenFunc(url)
+	if m.ShortenFunc != nil {
+		return m.ShortenFunc(url)
+	}
+	return "", nil
 }
 
 func (m *MockURLService) Expand(shortID string) (string, error) {
-	return m.ExpandFunc(shortID)
+	if m.ExpandFunc != nil {
+		return m.ExpandFunc(shortID)
+	}
+	return "", nil
+}
+
+func (m *MockURLService) PingDB() error {
+	if m.PingDBFunc != nil {
+		return m.PingDBFunc()
+	}
+	return nil
+}
+
+func (m *MockURLService) ShortenBatch(ctx context.Context, requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error) {
+	if m.ShortenBatchFunc != nil {
+		return m.ShortenBatchFunc(ctx, requests)
+	}
+
+	responses := make([]usecase.BatchShortenResponse, len(requests))
+	for i, req := range requests {
+		responses[i] = usecase.BatchShortenResponse{
+			CorrelationID: req.CorrelationID,
+			ShortURL:      "http://localhost:8080/batch" + string(rune(i+'1')),
+		}
+	}
+	return responses, nil
 }
 
 func TestHTTPController_handleShorten(t *testing.T) {
@@ -65,6 +98,19 @@ func TestHTTPController_handleShorten(t *testing.T) {
 			requestBody:    "https://example.com",
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   "Shorten failed\n",
+		},
+		{
+			name: "URL conflict",
+			mockService: &MockURLService{
+				ShortenFunc: func(url string) (string, error) {
+					return "http://localhost:8080/existing123", &usecase.ErrURLConflict{
+						ExistingShortURL: "http://localhost:8080/existing123",
+					}
+				},
+			},
+			requestBody:    "https://example.com",
+			expectedStatus: http.StatusConflict,
+			expectedBody:   "http://localhost:8080/existing123",
 		},
 	}
 
@@ -156,6 +202,18 @@ func TestHandleShortenJSON(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 		},
+		{
+			name: "конфликт URL",
+			request: ShortenRequest{
+				URL: "https://practicum.yandex.ru",
+			},
+			mockResponse: "http://localhost:8080/existing123",
+			mockError: &usecase.ErrURLConflict{
+				ExistingShortURL: "http://localhost:8080/existing123",
+			},
+			expectedStatus: http.StatusConflict,
+			expectedResult: "http://localhost:8080/existing123",
+		},
 	}
 
 	for _, tt := range tests {
@@ -179,11 +237,149 @@ func TestHandleShortenJSON(t *testing.T) {
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
-			if tt.expectedStatus == http.StatusCreated {
+			if tt.expectedStatus == http.StatusCreated || tt.expectedStatus == http.StatusConflict {
 				var response ShortenResponse
 				err = json.NewDecoder(w.Body).Decode(&response)
 				require.NoError(t, err)
 				assert.Equal(t, tt.expectedResult, response.Result)
+			}
+		})
+	}
+}
+
+func TestHTTPController_handlePing(t *testing.T) {
+	tests := []struct {
+		name           string
+		service        URLService
+		expectedStatus int
+	}{
+		{
+			name: "успешный пинг базы данных",
+			service: &MockURLService{
+				PingDBFunc: func() error {
+					return nil
+				},
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "ошибка пинга базы данных",
+			service: &MockURLService{
+				PingDBFunc: func() error {
+					return errors.New("database connection failed")
+				},
+			},
+			expectedStatus: http.StatusInternalServerError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewHTTPController(tt.service)
+
+			req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+			w := httptest.NewRecorder()
+
+			c.handlePing(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+		})
+	}
+}
+
+func TestHTTPController_handleShortenBatch(t *testing.T) {
+	tests := []struct {
+		name           string
+		requests       []usecase.BatchShortenRequest
+		mockService    *MockURLService
+		expectedStatus int
+		expectedCount  int
+		requestBody    string
+		invalidJSON    bool
+	}{
+		{
+			name: "успешный batch запрос",
+			requests: []usecase.BatchShortenRequest{
+				{CorrelationID: "1", OriginalURL: "https://example.com"},
+				{CorrelationID: "2", OriginalURL: "https://google.com"},
+			},
+			mockService: &MockURLService{
+				ShortenBatchFunc: func(ctx context.Context, requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error) {
+					responses := make([]usecase.BatchShortenResponse, len(requests))
+					for i, req := range requests {
+						responses[i] = usecase.BatchShortenResponse{
+							CorrelationID: req.CorrelationID,
+							ShortURL:      "http://localhost:8080/test" + string(rune(i+'1')),
+						}
+					}
+					return responses, nil
+				},
+			},
+			expectedStatus: http.StatusCreated,
+			expectedCount:  2,
+		},
+		{
+			name:           "пустой batch запрос",
+			requests:       []usecase.BatchShortenRequest{},
+			mockService:    &MockURLService{},
+			expectedStatus: http.StatusBadRequest,
+			expectedCount:  0,
+		},
+		{
+			name:           "невалидный JSON",
+			mockService:    &MockURLService{},
+			expectedStatus: http.StatusBadRequest,
+			requestBody:    "invalid json",
+			invalidJSON:    true,
+		},
+		{
+			name: "ошибка сервиса",
+			requests: []usecase.BatchShortenRequest{
+				{CorrelationID: "1", OriginalURL: "https://example.com"},
+			},
+			mockService: &MockURLService{
+				ShortenBatchFunc: func(ctx context.Context, requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error) {
+					return nil, errors.New("service error")
+				},
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedCount:  0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			controller := NewHTTPController(tt.mockService)
+
+			var body []byte
+			var err error
+
+			if tt.invalidJSON {
+				body = []byte(tt.requestBody)
+			} else {
+				body, err = json.Marshal(tt.requests)
+				require.NoError(t, err)
+			}
+
+			req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+
+			rr := httptest.NewRecorder()
+			controller.ServeHTTP(rr, req)
+
+			assert.Equal(t, tt.expectedStatus, rr.Code)
+
+			if tt.expectedStatus == http.StatusCreated {
+				assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+
+				var responses []usecase.BatchShortenResponse
+				err = json.Unmarshal(rr.Body.Bytes(), &responses)
+				require.NoError(t, err)
+
+				assert.Len(t, responses, tt.expectedCount)
+				for i, response := range responses {
+					assert.Equal(t, tt.requests[i].CorrelationID, response.CorrelationID)
+					assert.NotEmpty(t, response.ShortURL)
+				}
 			}
 		})
 	}

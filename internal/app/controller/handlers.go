@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	appmiddleware "github.com/m-molecula741/shortener/internal/app/middleware"
+	"github.com/m-molecula741/shortener/internal/app/usecase"
 )
 
 type HTTPController struct {
@@ -40,6 +41,8 @@ func (c *HTTPController) setupRoutes() {
 	c.router.Post("/", c.handleShorten)
 	c.router.Get("/{shortID}", c.handleRedirect)
 	c.router.Post("/api/shorten", c.handleShortenJSON)
+	c.router.Post("/api/shorten/batch", c.handleShortenBatch)
+	c.router.Get("/ping", c.handlePing)
 }
 
 func (c *HTTPController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +63,12 @@ func (c *HTTPController) handleShorten(w http.ResponseWriter, r *http.Request) {
 
 	shortURL, err := c.service.Shorten(string(body))
 	if err != nil {
+		if conflictErr, isConflict := usecase.IsURLConflict(err); isConflict {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(conflictErr.ExistingShortURL))
+			return
+		}
 		http.Error(w, "Shorten failed", http.StatusBadRequest)
 		return
 	}
@@ -102,6 +111,15 @@ func (c *HTTPController) handleShortenJSON(w http.ResponseWriter, r *http.Reques
 
 	shortURL, err := c.service.Shorten(req.URL)
 	if err != nil {
+		if conflictErr, isConflict := usecase.IsURLConflict(err); isConflict {
+			response := ShortenResponse{
+				Result: conflictErr.ExistingShortURL,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(response)
+			return
+		}
 		http.Error(w, "Shorten failed", http.StatusInternalServerError)
 		return
 	}
@@ -113,4 +131,37 @@ func (c *HTTPController) handleShortenJSON(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(response)
+}
+
+func (c *HTTPController) handlePing(w http.ResponseWriter, r *http.Request) {
+	if err := c.service.PingDB(); err != nil {
+		http.Error(w, "Database connection failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (c *HTTPController) handleShortenBatch(w http.ResponseWriter, r *http.Request) {
+	var requests []usecase.BatchShortenRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if len(requests) == 0 {
+		http.Error(w, "Empty batch", http.StatusBadRequest)
+		return
+	}
+
+	responses, err := c.service.ShortenBatch(r.Context(), requests)
+	if err != nil {
+		http.Error(w, "Batch shorten failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(responses)
 }

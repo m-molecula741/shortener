@@ -1,11 +1,13 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/m-molecula741/shortener/internal/app/usecase"
 )
 
 type InMemoryStorage struct {
@@ -36,6 +38,13 @@ func NewInMemoryStorage(filePath string) (*InMemoryStorage, error) {
 func (s *InMemoryStorage) Save(shortID, url string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Проверяем, есть ли уже такой URL
+	for existingShortID, existingURL := range s.urls {
+		if existingURL == url {
+			return &usecase.ErrURLConflict{ExistingShortURL: existingShortID}
+		}
+	}
 
 	s.urls[shortID] = url
 	return nil
@@ -70,3 +79,16 @@ func (s *InMemoryStorage) Backup() error {
 var (
 	ErrNotFound = errors.New("url not found")
 )
+
+// SaveBatch сохраняет множество URL за одну операцию
+func (s *InMemoryStorage) SaveBatch(ctx context.Context, urls []usecase.URLPair) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Сохраняем в память
+	for _, url := range urls {
+		s.urls[url.ShortID] = url.OriginalURL
+	}
+
+	return nil
+}
