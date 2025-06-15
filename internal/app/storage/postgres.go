@@ -39,6 +39,7 @@ func (s *PostgresStorage) createTable() error {
 		CREATE TABLE IF NOT EXISTS urls (
 			short_id VARCHAR(8) PRIMARY KEY,
 			original_url TEXT NOT NULL,
+			user_id VARCHAR(36),
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_urls_original_url ON urls(original_url);
@@ -92,8 +93,9 @@ func (s *PostgresStorage) Ping() error {
 }
 
 // Close закрывает соединение с базой данных (реализация DatabasePinger)
-func (s *PostgresStorage) Close() {
+func (s *PostgresStorage) Close() error {
 	s.pool.Close()
+	return nil
 }
 
 // SaveBatch сохраняет множество URL за одну операцию в рамках транзакции
@@ -106,14 +108,14 @@ func (s *PostgresStorage) SaveBatch(ctx context.Context, urls []usecase.URLPair)
 	defer tx.Rollback(ctx) // Откатываем транзакцию в случае ошибки
 
 	query := `
-		INSERT INTO urls (short_id, original_url) 
-		VALUES ($1, $2) 
+		INSERT INTO urls (short_id, original_url, user_id) 
+		VALUES ($1, $2, $3) 
 		ON CONFLICT (original_url) DO NOTHING
 	`
 
 	// Выполняем все вставки в рамках одной транзакции
 	for _, url := range urls {
-		_, err := tx.Exec(ctx, query, url.ShortID, url.OriginalURL)
+		_, err := tx.Exec(ctx, query, url.ShortID, url.OriginalURL, url.UserID)
 		if err != nil {
 			return fmt.Errorf("failed to save URL %s: %w", url.ShortID, err)
 		}
@@ -125,4 +127,34 @@ func (s *PostgresStorage) SaveBatch(ctx context.Context, urls []usecase.URLPair)
 	}
 
 	return nil
+}
+
+// GetUserURLs получает все URL пользователя
+func (s *PostgresStorage) GetUserURLs(ctx context.Context, userID string) ([]usecase.UserURL, error) {
+	query := `SELECT short_id, original_url FROM urls WHERE user_id = $1`
+
+	rows, err := s.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query user URLs: %w", err)
+	}
+	defer rows.Close()
+
+	var urls []usecase.UserURL
+	for rows.Next() {
+		var shortID, originalURL string
+		if err := rows.Scan(&shortID, &originalURL); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		urls = append(urls, usecase.UserURL{
+			ShortURL:    fmt.Sprintf("http://localhost:8080/%s", shortID),
+			OriginalURL: originalURL,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	return urls, nil
 }

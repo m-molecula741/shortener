@@ -13,6 +13,7 @@ import (
 type InMemoryStorage struct {
 	mu     sync.Mutex
 	urls   map[string]string
+	users  map[string][]string // userID -> []shortID
 	backup *FileBackup
 }
 
@@ -22,6 +23,7 @@ func NewInMemoryStorage(filePath string) (*InMemoryStorage, error) {
 	// Создаем хранилище
 	s := &InMemoryStorage{
 		urls:   make(map[string]string),
+		users:  make(map[string][]string),
 		backup: backup,
 	}
 
@@ -88,7 +90,36 @@ func (s *InMemoryStorage) SaveBatch(ctx context.Context, urls []usecase.URLPair)
 	// Сохраняем в память
 	for _, url := range urls {
 		s.urls[url.ShortID] = url.OriginalURL
+		if url.UserID != "" {
+			s.users[url.UserID] = append(s.users[url.UserID], url.ShortID)
+		}
 	}
 
 	return nil
+}
+
+// GetUserURLs получает все URL пользователя
+func (s *InMemoryStorage) GetUserURLs(ctx context.Context, userID string) ([]usecase.UserURL, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	shortIDs, exists := s.users[userID]
+	if !exists {
+		return nil, nil
+	}
+
+	urls := make([]usecase.UserURL, 0, len(shortIDs))
+	for _, shortID := range shortIDs {
+		originalURL, exists := s.urls[shortID]
+		if !exists {
+			continue
+		}
+
+		urls = append(urls, usecase.UserURL{
+			ShortURL:    fmt.Sprintf("http://localhost:8080/%s", shortID),
+			OriginalURL: originalURL,
+		})
+	}
+
+	return urls, nil
 }

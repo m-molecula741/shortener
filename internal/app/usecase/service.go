@@ -7,22 +7,6 @@ import (
 	"strings"
 )
 
-// Структуры для batch операций
-type URLPair struct {
-	ShortID     string
-	OriginalURL string
-}
-
-type BatchShortenRequest struct {
-	CorrelationID string `json:"correlation_id"`
-	OriginalURL   string `json:"original_url"`
-}
-
-type BatchShortenResponse struct {
-	CorrelationID string `json:"correlation_id"`
-	ShortURL      string `json:"short_url"`
-}
-
 type URLService struct {
 	storage  URLStorage
 	baseURL  string
@@ -112,4 +96,9 @@ func (s *URLService) ShortenBatch(ctx context.Context, requests []BatchShortenRe
 	}
 
 	return responses, nil
+}
+
+// GetUserURLs получает все URL пользователя
+func (s *URLService) GetUserURLs(ctx context.Context, userID string) ([]UserURL, error) {
+	return s.storage.GetUserURLs(ctx, userID)
 }

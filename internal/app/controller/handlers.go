@@ -14,12 +14,14 @@ import (
 type HTTPController struct {
 	service URLService
 	router  *chi.Mux
+	auth    *appmiddleware.AuthMiddleware
 }
 
-func NewHTTPController(service URLService) *HTTPController {
+func NewHTTPController(service URLService, auth *appmiddleware.AuthMiddleware) *HTTPController {
 	c := &HTTPController{
 		service: service,
 		router:  chi.NewRouter(),
+		auth:    auth,
 	}
 	c.setupRoutes()
 	return c
@@ -37,12 +39,14 @@ func (c *HTTPController) setupRoutes() {
 	c.router.Use(chimiddleware.Logger)
 	c.router.Use(chimiddleware.Recoverer)
 	c.router.Use(appmiddleware.GzipMiddleware)
+	c.router.Use(c.auth.Middleware)
 
 	c.router.Post("/", c.handleShorten)
 	c.router.Get("/{shortID}", c.handleRedirect)
 	c.router.Post("/api/shorten", c.handleShortenJSON)
 	c.router.Post("/api/shorten/batch", c.handleShortenBatch)
 	c.router.Get("/ping", c.handlePing)
+	c.router.Get("/api/user/urls", c.handleGetUserURLs)
 }
 
 func (c *HTTPController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -164,4 +168,31 @@ func (c *HTTPController) handleShortenBatch(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(responses)
+}
+
+func (c *HTTPController) handleGetUserURLs(w http.ResponseWriter, r *http.Request) {
+	// Получаем ID пользователя из куки
+	userID, err := c.auth.GetUserID(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Получаем URL пользователя
+	urls, err := c.service.GetUserURLs(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "Failed to get user URLs", http.StatusInternalServerError)
+		return
+	}
+
+	// Если у пользователя нет URL, возвращаем 204
+	if len(urls) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	// Возвращаем URL пользователя
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(urls)
 }

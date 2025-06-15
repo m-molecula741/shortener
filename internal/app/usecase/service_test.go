@@ -16,6 +16,7 @@ type MockURLStorage struct {
 	SaveFunc           func(shortID, url string) error
 	GetFunc            func(shortID string) (string, error)
 	SaveBatchFunc      func(ctx context.Context, urls []URLPair) error
+	GetUserURLsFunc    func(ctx context.Context, userID string) ([]UserURL, error)
 	SaveBatchCallCount int
 	LastSavedBatch     []URLPair
 }
@@ -43,10 +44,17 @@ func (m *MockURLStorage) SaveBatch(ctx context.Context, urls []URLPair) error {
 	return nil
 }
 
+func (m *MockURLStorage) GetUserURLs(ctx context.Context, userID string) ([]UserURL, error) {
+	if m.GetUserURLsFunc != nil {
+		return m.GetUserURLsFunc(ctx, userID)
+	}
+	return nil, nil
+}
+
 // MockDatabasePinger мок для DatabasePinger
 type MockDatabasePinger struct {
 	PingFunc  func() error
-	CloseFunc func()
+	CloseFunc func() error
 }
 
 func (m *MockDatabasePinger) Ping() error {
@@ -56,10 +64,11 @@ func (m *MockDatabasePinger) Ping() error {
 	return nil
 }
 
-func (m *MockDatabasePinger) Close() {
+func (m *MockDatabasePinger) Close() error {
 	if m.CloseFunc != nil {
-		m.CloseFunc()
+		return m.CloseFunc()
 	}
+	return nil
 }
 
 func TestURLService_Shorten(t *testing.T) {

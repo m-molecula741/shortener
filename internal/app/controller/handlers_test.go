@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/m-molecula741/shortener/internal/app/middleware"
 	"github.com/m-molecula741/shortener/internal/app/usecase"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,7 @@ type MockURLService struct {
 	ExpandFunc       func(shortID string) (string, error)
 	PingDBFunc       func() error
 	ShortenBatchFunc func(ctx context.Context, requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error)
+	GetUserURLsFunc  func(ctx context.Context, userID string) ([]usecase.UserURL, error)
 }
 
 func (m *MockURLService) Shorten(url string) (string, error) {
@@ -56,6 +58,13 @@ func (m *MockURLService) ShortenBatch(ctx context.Context, requests []usecase.Ba
 		}
 	}
 	return responses, nil
+}
+
+func (m *MockURLService) GetUserURLs(ctx context.Context, userID string) ([]usecase.UserURL, error) {
+	if m.GetUserURLsFunc != nil {
+		return m.GetUserURLsFunc(ctx, userID)
+	}
+	return nil, nil
 }
 
 func TestHTTPController_handleShorten(t *testing.T) {
@@ -116,7 +125,9 @@ func TestHTTPController_handleShorten(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			controller := NewHTTPController(tt.mockService)
+			auth, err := middleware.NewAuthMiddleware("test-key")
+			require.NoError(t, err)
+			controller := NewHTTPController(tt.mockService, auth)
 
 			req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(tt.requestBody))
 			w := httptest.NewRecorder()
@@ -163,7 +174,9 @@ func TestHTTPController_handleRedirect(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			controller := NewHTTPController(tt.mockService)
+			auth, err := middleware.NewAuthMiddleware("test-key")
+			require.NoError(t, err)
+			controller := NewHTTPController(tt.mockService, auth)
 
 			req := httptest.NewRequest(http.MethodGet, "/"+tt.shortID, nil)
 			w := httptest.NewRecorder()
@@ -224,7 +237,9 @@ func TestHandleShortenJSON(t *testing.T) {
 				},
 			}
 
-			controller := NewHTTPController(mockService)
+			auth, err := middleware.NewAuthMiddleware("test-key")
+			require.NoError(t, err)
+			controller := NewHTTPController(mockService, auth)
 
 			reqBody, err := json.Marshal(tt.request)
 			require.NoError(t, err)
@@ -274,7 +289,9 @@ func TestHTTPController_handlePing(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewHTTPController(tt.service)
+			auth, err := middleware.NewAuthMiddleware("test-key")
+			require.NoError(t, err)
+			c := NewHTTPController(tt.service, auth)
 
 			req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 			w := httptest.NewRecorder()
@@ -348,16 +365,18 @@ func TestHTTPController_handleShortenBatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			controller := NewHTTPController(tt.mockService)
+			auth, err := middleware.NewAuthMiddleware("test-key")
+			require.NoError(t, err)
+			controller := NewHTTPController(tt.mockService, auth)
 
 			var body []byte
-			var err error
+			var err2 error
 
 			if tt.invalidJSON {
 				body = []byte(tt.requestBody)
 			} else {
-				body, err = json.Marshal(tt.requests)
-				require.NoError(t, err)
+				body, err2 = json.Marshal(tt.requests)
+				require.NoError(t, err2)
 			}
 
 			req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(body))
@@ -372,14 +391,109 @@ func TestHTTPController_handleShortenBatch(t *testing.T) {
 				assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
 
 				var responses []usecase.BatchShortenResponse
-				err = json.Unmarshal(rr.Body.Bytes(), &responses)
-				require.NoError(t, err)
+				err2 = json.Unmarshal(rr.Body.Bytes(), &responses)
+				require.NoError(t, err2)
 
 				assert.Len(t, responses, tt.expectedCount)
 				for i, response := range responses {
 					assert.Equal(t, tt.requests[i].CorrelationID, response.CorrelationID)
 					assert.NotEmpty(t, response.ShortURL)
 				}
+			}
+		})
+	}
+}
+
+func TestHTTPController_handleGetUserURLs(t *testing.T) {
+	tests := []struct {
+		name           string
+		mockService    *MockURLService
+		expectedStatus int
+		expectedURLs   []usecase.UserURL
+	}{
+		{
+			name: "успешное получение URL пользователя",
+			mockService: &MockURLService{
+				GetUserURLsFunc: func(ctx context.Context, userID string) ([]usecase.UserURL, error) {
+					return []usecase.UserURL{
+						{
+							ShortURL:    "http://localhost:8080/abc123",
+							OriginalURL: "https://example.com",
+						},
+						{
+							ShortURL:    "http://localhost:8080/def456",
+							OriginalURL: "https://google.com",
+						},
+					}, nil
+				},
+			},
+			expectedStatus: http.StatusOK,
+			expectedURLs: []usecase.UserURL{
+				{
+					ShortURL:    "http://localhost:8080/abc123",
+					OriginalURL: "https://example.com",
+				},
+				{
+					ShortURL:    "http://localhost:8080/def456",
+					OriginalURL: "https://google.com",
+				},
+			},
+		},
+		{
+			name: "нет URL у пользователя",
+			mockService: &MockURLService{
+				GetUserURLsFunc: func(ctx context.Context, userID string) ([]usecase.UserURL, error) {
+					return nil, nil
+				},
+			},
+			expectedStatus: http.StatusNoContent,
+			expectedURLs:   nil,
+		},
+		{
+			name: "ошибка получения URL",
+			mockService: &MockURLService{
+				GetUserURLsFunc: func(ctx context.Context, userID string) ([]usecase.UserURL, error) {
+					return nil, errors.New("storage error")
+				},
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedURLs:   nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			auth, err := middleware.NewAuthMiddleware("test-key")
+			require.NoError(t, err)
+			controller := NewHTTPController(tt.mockService, auth)
+
+			req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+
+			// Добавляем валидную куку пользователя
+			testUserID := "test-user-123"
+			err = auth.SetUserID(httptest.NewRecorder(), testUserID)
+			require.NoError(t, err)
+
+			// Получаем зашифрованную куку
+			tempW := httptest.NewRecorder()
+			err = auth.SetUserID(tempW, testUserID)
+			require.NoError(t, err)
+
+			cookies := tempW.Result().Cookies()
+			require.Len(t, cookies, 1)
+			req.AddCookie(cookies[0])
+
+			w := httptest.NewRecorder()
+
+			controller.handleGetUserURLs(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.expectedStatus == http.StatusOK {
+				var urls []usecase.UserURL
+				err := json.NewDecoder(w.Body).Decode(&urls)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedURLs, urls)
 			}
 		})
 	}
