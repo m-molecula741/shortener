@@ -43,6 +43,27 @@ func (s *URLService) Shorten(url string) (string, error) {
 	return s.baseURL + shortID, nil
 }
 
+// ShortenWithUser сокращает URL и связывает его с пользователем
+func (s *URLService) ShortenWithUser(ctx context.Context, url, userID string) (string, error) {
+	shortID, err := generateShortID()
+	if err != nil {
+		return "", err
+	}
+
+	// Сохраняем URL с привязкой к пользователю
+	urlPair := URLPair{
+		ShortID:     shortID,
+		OriginalURL: url,
+		UserID:      userID,
+	}
+
+	if err := s.storage.SaveBatch(ctx, []URLPair{urlPair}); err != nil {
+		return "", err
+	}
+
+	return s.baseURL + shortID, nil
+}
+
 func (s *URLService) Expand(shortID string) (string, error) {
 	return s.storage.Get(shortID)
 }
@@ -82,6 +103,42 @@ func (s *URLService) ShortenBatch(ctx context.Context, requests []BatchShortenRe
 		urlPairs[i] = URLPair{
 			ShortID:     shortID,
 			OriginalURL: req.OriginalURL,
+		}
+
+		responses[i] = BatchShortenResponse{
+			CorrelationID: req.CorrelationID,
+			ShortURL:      s.baseURL + shortID,
+		}
+	}
+
+	// Сохраняем все URL одной операцией
+	if err := s.storage.SaveBatch(ctx, urlPairs); err != nil {
+		return nil, err
+	}
+
+	return responses, nil
+}
+
+// ShortenBatchWithUser сокращает множество URL за одну операцию с привязкой к пользователю
+func (s *URLService) ShortenBatchWithUser(ctx context.Context, requests []BatchShortenRequest, userID string) ([]BatchShortenResponse, error) {
+	if len(requests) == 0 {
+		return []BatchShortenResponse{}, nil
+	}
+
+	// Подготавливаем данные для batch сохранения
+	urlPairs := make([]URLPair, len(requests))
+	responses := make([]BatchShortenResponse, len(requests))
+
+	for i, req := range requests {
+		shortID, err := generateShortID()
+		if err != nil {
+			return nil, err
+		}
+
+		urlPairs[i] = URLPair{
+			ShortID:     shortID,
+			OriginalURL: req.OriginalURL,
+			UserID:      userID,
 		}
 
 		responses[i] = BatchShortenResponse{

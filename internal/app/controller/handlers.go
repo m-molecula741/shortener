@@ -65,7 +65,10 @@ func (c *HTTPController) handleShorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := c.service.Shorten(string(body))
+	// Получаем userID из контекста
+	userID, _ := appmiddleware.GetUserIDFromContext(r.Context())
+
+	shortURL, err := c.service.ShortenWithUser(r.Context(), string(body), userID)
 	if err != nil {
 		if conflictErr, isConflict := usecase.IsURLConflict(err); isConflict {
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -113,7 +116,10 @@ func (c *HTTPController) handleShortenJSON(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	shortURL, err := c.service.Shorten(req.URL)
+	// Получаем userID из контекста
+	userID, _ := appmiddleware.GetUserIDFromContext(r.Context())
+
+	shortURL, err := c.service.ShortenWithUser(r.Context(), req.URL, userID)
 	if err != nil {
 		if conflictErr, isConflict := usecase.IsURLConflict(err); isConflict {
 			response := ShortenResponse{
@@ -159,7 +165,10 @@ func (c *HTTPController) handleShortenBatch(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	responses, err := c.service.ShortenBatch(r.Context(), requests)
+	// Получаем userID из контекста
+	userID, _ := appmiddleware.GetUserIDFromContext(r.Context())
+
+	responses, err := c.service.ShortenBatchWithUser(r.Context(), requests, userID)
 	if err != nil {
 		http.Error(w, "Batch shorten failed", http.StatusInternalServerError)
 		return
@@ -171,9 +180,9 @@ func (c *HTTPController) handleShortenBatch(w http.ResponseWriter, r *http.Reque
 }
 
 func (c *HTTPController) handleGetUserURLs(w http.ResponseWriter, r *http.Request) {
-	// Получаем ID пользователя из куки
-	userID, err := c.auth.GetUserID(r)
-	if err != nil {
+	// Получаем ID пользователя из контекста (middleware уже добавил его)
+	userID, ok := appmiddleware.GetUserIDFromContext(r.Context())
+	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}

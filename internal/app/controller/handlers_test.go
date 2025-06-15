@@ -17,11 +17,13 @@ import (
 
 // MockURLService мок для URLService
 type MockURLService struct {
-	ShortenFunc      func(url string) (string, error)
-	ExpandFunc       func(shortID string) (string, error)
-	PingDBFunc       func() error
-	ShortenBatchFunc func(ctx context.Context, requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error)
-	GetUserURLsFunc  func(ctx context.Context, userID string) ([]usecase.UserURL, error)
+	ShortenFunc              func(url string) (string, error)
+	ShortenWithUserFunc      func(ctx context.Context, url, userID string) (string, error)
+	ExpandFunc               func(shortID string) (string, error)
+	PingDBFunc               func() error
+	ShortenBatchFunc         func(ctx context.Context, requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error)
+	ShortenBatchWithUserFunc func(ctx context.Context, requests []usecase.BatchShortenRequest, userID string) ([]usecase.BatchShortenResponse, error)
+	GetUserURLsFunc          func(ctx context.Context, userID string) ([]usecase.UserURL, error)
 }
 
 func (m *MockURLService) Shorten(url string) (string, error) {
@@ -29,6 +31,13 @@ func (m *MockURLService) Shorten(url string) (string, error) {
 		return m.ShortenFunc(url)
 	}
 	return "", nil
+}
+
+func (m *MockURLService) ShortenWithUser(ctx context.Context, url, userID string) (string, error) {
+	if m.ShortenWithUserFunc != nil {
+		return m.ShortenWithUserFunc(ctx, url, userID)
+	}
+	return "http://localhost:8080/test123", nil
 }
 
 func (m *MockURLService) Expand(shortID string) (string, error) {
@@ -60,6 +69,21 @@ func (m *MockURLService) ShortenBatch(ctx context.Context, requests []usecase.Ba
 	return responses, nil
 }
 
+func (m *MockURLService) ShortenBatchWithUser(ctx context.Context, requests []usecase.BatchShortenRequest, userID string) ([]usecase.BatchShortenResponse, error) {
+	if m.ShortenBatchWithUserFunc != nil {
+		return m.ShortenBatchWithUserFunc(ctx, requests, userID)
+	}
+
+	responses := make([]usecase.BatchShortenResponse, len(requests))
+	for i, req := range requests {
+		responses[i] = usecase.BatchShortenResponse{
+			CorrelationID: req.CorrelationID,
+			ShortURL:      "http://localhost:8080/batch" + string(rune(i+'1')),
+		}
+	}
+	return responses, nil
+}
+
 func (m *MockURLService) GetUserURLs(ctx context.Context, userID string) ([]usecase.UserURL, error) {
 	if m.GetUserURLsFunc != nil {
 		return m.GetUserURLsFunc(ctx, userID)
@@ -78,7 +102,7 @@ func TestHTTPController_handleShorten(t *testing.T) {
 		{
 			name: "successful shortening",
 			mockService: &MockURLService{
-				ShortenFunc: func(url string) (string, error) {
+				ShortenWithUserFunc: func(ctx context.Context, url, userID string) (string, error) {
 					return "abc123", nil
 				},
 			},
@@ -89,7 +113,7 @@ func TestHTTPController_handleShorten(t *testing.T) {
 		{
 			name: "empty body",
 			mockService: &MockURLService{
-				ShortenFunc: func(url string) (string, error) {
+				ShortenWithUserFunc: func(ctx context.Context, url, userID string) (string, error) {
 					return "unreachable", nil
 				},
 			},
@@ -100,7 +124,7 @@ func TestHTTPController_handleShorten(t *testing.T) {
 		{
 			name: "service error",
 			mockService: &MockURLService{
-				ShortenFunc: func(url string) (string, error) {
+				ShortenWithUserFunc: func(ctx context.Context, url, userID string) (string, error) {
 					return "", errors.New("storage error")
 				},
 			},
@@ -111,7 +135,7 @@ func TestHTTPController_handleShorten(t *testing.T) {
 		{
 			name: "URL conflict",
 			mockService: &MockURLService{
-				ShortenFunc: func(url string) (string, error) {
+				ShortenWithUserFunc: func(ctx context.Context, url, userID string) (string, error) {
 					return "http://localhost:8080/existing123", &usecase.ErrURLConflict{
 						ExistingShortURL: "http://localhost:8080/existing123",
 					}
@@ -232,7 +256,7 @@ func TestHandleShortenJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockService := &MockURLService{
-				ShortenFunc: func(url string) (string, error) {
+				ShortenWithUserFunc: func(ctx context.Context, url, userID string) (string, error) {
 					return tt.mockResponse, tt.mockError
 				},
 			}
@@ -321,7 +345,7 @@ func TestHTTPController_handleShortenBatch(t *testing.T) {
 				{CorrelationID: "2", OriginalURL: "https://google.com"},
 			},
 			mockService: &MockURLService{
-				ShortenBatchFunc: func(ctx context.Context, requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error) {
+				ShortenBatchWithUserFunc: func(ctx context.Context, requests []usecase.BatchShortenRequest, userID string) ([]usecase.BatchShortenResponse, error) {
 					responses := make([]usecase.BatchShortenResponse, len(requests))
 					for i, req := range requests {
 						responses[i] = usecase.BatchShortenResponse{
@@ -355,7 +379,7 @@ func TestHTTPController_handleShortenBatch(t *testing.T) {
 				{CorrelationID: "1", OriginalURL: "https://example.com"},
 			},
 			mockService: &MockURLService{
-				ShortenBatchFunc: func(ctx context.Context, requests []usecase.BatchShortenRequest) ([]usecase.BatchShortenResponse, error) {
+				ShortenBatchWithUserFunc: func(ctx context.Context, requests []usecase.BatchShortenRequest, userID string) ([]usecase.BatchShortenResponse, error) {
 					return nil, errors.New("service error")
 				},
 			},
@@ -488,7 +512,8 @@ func TestHTTPController_handleGetUserURLs(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			controller.handleGetUserURLs(w, req)
+			// Используем полный роутер вместо прямого вызова handleGetUserURLs
+			controller.ServeHTTP(w, req)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
