@@ -248,13 +248,13 @@ func TestHandleShortenJSON(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
-			controller.ServeHTTP(w, req)
+			controller.handleShortenJSON(w, req)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
 			if tt.expectedStatus == http.StatusCreated || tt.expectedStatus == http.StatusConflict {
 				var response ShortenResponse
-				err = json.NewDecoder(w.Body).Decode(&response)
+				err := json.NewDecoder(w.Body).Decode(&response)
 				require.NoError(t, err)
 				assert.Equal(t, tt.expectedResult, response.Result)
 			}
@@ -265,12 +265,12 @@ func TestHandleShortenJSON(t *testing.T) {
 func TestHTTPController_handlePing(t *testing.T) {
 	tests := []struct {
 		name           string
-		service        URLService
+		mockService    *MockURLService
 		expectedStatus int
 	}{
 		{
-			name: "успешный пинг базы данных",
-			service: &MockURLService{
+			name: "successful ping",
+			mockService: &MockURLService{
 				PingDBFunc: func() error {
 					return nil
 				},
@@ -278,8 +278,8 @@ func TestHTTPController_handlePing(t *testing.T) {
 			expectedStatus: http.StatusOK,
 		},
 		{
-			name: "ошибка пинга базы данных",
-			service: &MockURLService{
+			name: "ping error",
+			mockService: &MockURLService{
 				PingDBFunc: func() error {
 					return errors.New("database connection failed")
 				},
@@ -287,16 +287,17 @@ func TestHTTPController_handlePing(t *testing.T) {
 			expectedStatus: http.StatusInternalServerError,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			auth, err := middleware.NewAuthMiddleware("test-key")
 			require.NoError(t, err)
-			c := NewHTTPController(tt.service, auth)
+			controller := NewHTTPController(tt.mockService, auth)
 
 			req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 			w := httptest.NewRecorder()
 
-			c.handlePing(w, req)
+			controller.handlePing(w, req)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 		})
@@ -479,7 +480,9 @@ func TestHTTPController_handleGetUserURLs(t *testing.T) {
 			err = auth.SetUserID(tempW, testUserID)
 			require.NoError(t, err)
 
-			cookies := tempW.Result().Cookies()
+			result := tempW.Result()
+			cookies := result.Cookies()
+			defer result.Body.Close()
 			require.Len(t, cookies, 1)
 			req.AddCookie(cookies[0])
 

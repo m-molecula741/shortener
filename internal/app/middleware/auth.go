@@ -124,8 +124,8 @@ func (a *AuthMiddleware) decrypt(ciphertext string) (string, error) {
 		return "", errors.New("ciphertext too short")
 	}
 
-	nonce, ciphertext_bytes := data[:nonceSize], data[nonceSize:]
-	plaintext, err := a.gcm.Open(nil, nonce, ciphertext_bytes, nil)
+	nonce, ciphertextBytes := data[:nonceSize], data[nonceSize:]
+	plaintext, err := a.gcm.Open(nil, nonce, ciphertextBytes, nil)
 	if err != nil {
 		return "", err
 	}
