@@ -67,8 +67,7 @@ func (s *URLService) ShortenWithUser(ctx context.Context, url, userID string) (s
 
 		// Обновляем запись с userID через SaveBatch
 		if err := s.storage.SaveBatch(ctx, []URLPair{urlPair}); err != nil {
-			// Если не удалось связать с пользователем, это не критично
-			// URL уже сохранен, просто не связан с пользователем
+			_ = err
 		}
 	}
 
