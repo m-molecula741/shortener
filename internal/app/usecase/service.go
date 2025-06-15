@@ -7,22 +7,6 @@ import (
 	"strings"
 )
 
-// Структуры для batch операций
-type URLPair struct {
-	ShortID     string
-	OriginalURL string
-}
-
-type BatchShortenRequest struct {
-	CorrelationID string `json:"correlation_id"`
-	OriginalURL   string `json:"original_url"`
-}
-
-type BatchShortenResponse struct {
-	CorrelationID string `json:"correlation_id"`
-	ShortURL      string `json:"short_url"`
-}
-
 type URLService struct {
 	storage  URLStorage
 	baseURL  string
@@ -57,6 +41,37 @@ func (s *URLService) Shorten(url string) (string, error) {
 	}
 
 	return s.baseURL + shortID, nil
+}
+
+// ShortenWithUser сокращает URL и связывает его с пользователем
+func (s *URLService) ShortenWithUser(ctx context.Context, url, userID string) (string, error) {
+	shortURL, err := s.Shorten(url)
+	if err != nil {
+		// Если это конфликт URL, возвращаем существующий URL
+		if _, isConflict := IsURLConflict(err); isConflict {
+			return shortURL, err // shortURL уже содержит полный URL с baseURL
+		}
+		return "", err
+	}
+
+	// Если URL успешно создан и у нас есть userID, связываем его с пользователем
+	if userID != "" {
+		// Извлекаем shortID из shortURL
+		shortID := shortURL[len(s.baseURL):]
+
+		urlPair := URLPair{
+			ShortID:     shortID,
+			OriginalURL: url,
+			UserID:      userID,
+		}
+
+		// Обновляем запись с userID через SaveBatch
+		if err := s.storage.SaveBatch(ctx, []URLPair{urlPair}); err != nil {
+			_ = err
+		}
+	}
+
+	return shortURL, nil
 }
 
 func (s *URLService) Expand(shortID string) (string, error) {
@@ -112,4 +127,45 @@ func (s *URLService) ShortenBatch(ctx context.Context, requests []BatchShortenRe
 	}
 
 	return responses, nil
+}
+
+// ShortenBatchWithUser сокращает множество URL за одну операцию с привязкой к пользователю
+func (s *URLService) ShortenBatchWithUser(ctx context.Context, requests []BatchShortenRequest, userID string) ([]BatchShortenResponse, error) {
+	if len(requests) == 0 {
+		return []BatchShortenResponse{}, nil
+	}
+
+	// Подготавливаем данные для batch сохранения
+	urlPairs := make([]URLPair, len(requests))
+	responses := make([]BatchShortenResponse, len(requests))
+
+	for i, req := range requests {
+		shortID, err := generateShortID()
+		if err != nil {
+			return nil, err
+		}
+
+		urlPairs[i] = URLPair{
+			ShortID:     shortID,
+			OriginalURL: req.OriginalURL,
+			UserID:      userID,
+		}
+
+		responses[i] = BatchShortenResponse{
+			CorrelationID: req.CorrelationID,
+			ShortURL:      s.baseURL + shortID,
+		}
+	}
+
+	// Сохраняем все URL одной операцией
+	if err := s.storage.SaveBatch(ctx, urlPairs); err != nil {
+		return nil, err
+	}
+
+	return responses, nil
+}
+
+// GetUserURLs получает все URL пользователя
+func (s *URLService) GetUserURLs(ctx context.Context, userID string) ([]UserURL, error) {
+	return s.storage.GetUserURLs(ctx, userID)
 }

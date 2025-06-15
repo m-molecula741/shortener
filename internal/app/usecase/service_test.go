@@ -16,6 +16,7 @@ type MockURLStorage struct {
 	SaveFunc           func(shortID, url string) error
 	GetFunc            func(shortID string) (string, error)
 	SaveBatchFunc      func(ctx context.Context, urls []URLPair) error
+	GetUserURLsFunc    func(ctx context.Context, userID string) ([]UserURL, error)
 	SaveBatchCallCount int
 	LastSavedBatch     []URLPair
 }
@@ -43,10 +44,17 @@ func (m *MockURLStorage) SaveBatch(ctx context.Context, urls []URLPair) error {
 	return nil
 }
 
+func (m *MockURLStorage) GetUserURLs(ctx context.Context, userID string) ([]UserURL, error) {
+	if m.GetUserURLsFunc != nil {
+		return m.GetUserURLsFunc(ctx, userID)
+	}
+	return nil, nil
+}
+
 // MockDatabasePinger мок для DatabasePinger
 type MockDatabasePinger struct {
 	PingFunc  func() error
-	CloseFunc func()
+	CloseFunc func() error
 }
 
 func (m *MockDatabasePinger) Ping() error {
@@ -56,10 +64,11 @@ func (m *MockDatabasePinger) Ping() error {
 	return nil
 }
 
-func (m *MockDatabasePinger) Close() {
+func (m *MockDatabasePinger) Close() error {
 	if m.CloseFunc != nil {
-		m.CloseFunc()
+		return m.CloseFunc()
 	}
+	return nil
 }
 
 func TestURLService_Shorten(t *testing.T) {
@@ -331,6 +340,78 @@ func TestURLService_ShortenBatch(t *testing.T) {
 			assert.Equal(t, tt.expectedCallCount, mockStorage.SaveBatchCallCount)
 			if tt.expectedCallCount > 0 {
 				assert.Len(t, mockStorage.LastSavedBatch, tt.expectedBatchLength)
+			}
+		})
+	}
+}
+
+func TestURLService_ShortenWithUser(t *testing.T) {
+	tests := []struct {
+		name             string
+		storage          *MockURLStorage
+		url              string
+		userID           string
+		wantErr          bool
+		wantConflict     bool
+		expectedShortURL string
+	}{
+		{
+			name: "успешное сокращение URL с пользователем",
+			storage: &MockURLStorage{
+				SaveFunc: func(shortID, url string) error {
+					return nil
+				},
+				SaveBatchFunc: func(ctx context.Context, urls []URLPair) error {
+					return nil
+				},
+			},
+			url:     "https://example.com",
+			userID:  "user123",
+			wantErr: false,
+		},
+		{
+			name: "конфликт URL - URL уже существует",
+			storage: &MockURLStorage{
+				SaveFunc: func(shortID, url string) error {
+					return &ErrURLConflict{ExistingShortURL: "existing123"}
+				},
+			},
+			url:              "https://example.com",
+			userID:           "user123",
+			wantErr:          true,
+			wantConflict:     true,
+			expectedShortURL: testBaseURL + "existing123",
+		},
+		{
+			name: "успешное сокращение URL без пользователя",
+			storage: &MockURLStorage{
+				SaveFunc: func(shortID, url string) error {
+					return nil
+				},
+			},
+			url:     "https://example.com",
+			userID:  "",
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := NewURLService(tt.storage, testBaseURL, nil)
+			got, err := service.ShortenWithUser(context.Background(), tt.url, tt.userID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("URLService.ShortenWithUser() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantConflict {
+				conflictErr, isConflict := IsURLConflict(err)
+				assert.True(t, isConflict)
+				assert.Equal(t, tt.expectedShortURL, conflictErr.ExistingShortURL)
+				assert.Equal(t, tt.expectedShortURL, got)
+			} else if !tt.wantErr {
+				assert.True(t, strings.HasPrefix(got, testBaseURL))
+				_, shortID := path.Split(got)
+				assert.Len(t, shortID, 8)
 			}
 		})
 	}
