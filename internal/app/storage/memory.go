@@ -89,9 +89,28 @@ func (s *InMemoryStorage) SaveBatch(ctx context.Context, urls []usecase.URLPair)
 
 	// Сохраняем в память
 	for _, url := range urls {
-		s.urls[url.ShortID] = url.OriginalURL
+		// Сохраняем URL если его еще нет
+		if _, exists := s.urls[url.ShortID]; !exists {
+			s.urls[url.ShortID] = url.OriginalURL
+		}
+
+		// Связываем с пользователем если указан userID
 		if url.UserID != "" {
-			s.users[url.UserID] = append(s.users[url.UserID], url.ShortID)
+			// Проверяем, не связан ли уже этот URL с пользователем
+			found := false
+			if shortIDs, exists := s.users[url.UserID]; exists {
+				for _, existingShortID := range shortIDs {
+					if existingShortID == url.ShortID {
+						found = true
+						break
+					}
+				}
+			}
+
+			// Добавляем связь если еще не существует
+			if !found {
+				s.users[url.UserID] = append(s.users[url.UserID], url.ShortID)
+			}
 		}
 	}
 

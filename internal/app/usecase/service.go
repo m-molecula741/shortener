@@ -45,23 +45,32 @@ func (s *URLService) Shorten(url string) (string, error) {
 
 // ShortenWithUser сокращает URL и связывает его с пользователем
 func (s *URLService) ShortenWithUser(ctx context.Context, url, userID string) (string, error) {
-	shortID, err := generateShortID()
+	shortURL, err := s.Shorten(url)
 	if err != nil {
+		// Если это конфликт URL, возвращаем существующий URL
+		if _, isConflict := IsURLConflict(err); isConflict {
+			return shortURL, err // shortURL уже содержит полный URL с baseURL
+		}
 		return "", err
 	}
 
-	// Сохраняем URL с привязкой к пользователю
-	urlPair := URLPair{
-		ShortID:     shortID,
-		OriginalURL: url,
-		UserID:      userID,
+	// Если URL успешно создан и у нас есть userID, связываем его с пользователем
+	if userID != "" {
+		// Извлекаем shortID из shortURL
+		shortID := shortURL[len(s.baseURL):]
+
+		urlPair := URLPair{
+			ShortID:     shortID,
+			OriginalURL: url,
+			UserID:      userID,
+		}
+
+		// Обновляем запись с userID через SaveBatch
+		if err := s.storage.SaveBatch(ctx, []URLPair{urlPair}); err != nil {
+		}
 	}
 
-	if err := s.storage.SaveBatch(ctx, []URLPair{urlPair}); err != nil {
-		return "", err
-	}
-
-	return s.baseURL + shortID, nil
+	return shortURL, nil
 }
 
 func (s *URLService) Expand(shortID string) (string, error) {

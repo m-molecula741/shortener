@@ -110,7 +110,7 @@ func (s *PostgresStorage) SaveBatch(ctx context.Context, urls []usecase.URLPair)
 	query := `
 		INSERT INTO urls (short_id, original_url, user_id) 
 		VALUES ($1, $2, $3) 
-		ON CONFLICT (original_url) DO NOTHING
+		ON CONFLICT (short_id) DO UPDATE SET user_id = EXCLUDED.user_id WHERE urls.user_id IS NULL
 	`
 
 	// Выполняем все вставки в рамках одной транзакции
