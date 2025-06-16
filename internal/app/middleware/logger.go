@@ -1,9 +1,9 @@
 package middleware
 
 import (
+	"github.com/m-molecula741/shortener/internal/app/logger"
 	"net/http"
 	"time"
-	"github.com/m-molecula741/shortener/internal/app/logger"
 )
 
 type responseWriter struct {
