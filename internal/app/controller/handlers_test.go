@@ -199,7 +199,7 @@ func TestHTTPController_handleRedirect(t *testing.T) {
 				},
 			},
 			shortID:        "invalid",
-			expectedStatus: http.StatusBadRequest,
+			expectedStatus: http.StatusNotFound,
 			expectedLoc:    "",
 		},
 	}

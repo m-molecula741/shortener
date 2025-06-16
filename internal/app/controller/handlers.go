@@ -47,6 +47,7 @@ func (c *HTTPController) setupRoutes() {
 	c.router.Post("/api/shorten/batch", c.handleShortenBatch)
 	c.router.Get("/ping", c.handlePing)
 	c.router.Get("/api/user/urls", c.handleGetUserURLs)
+	c.router.Delete("/api/user/urls", c.handleDeleteUserURLs)
 }
 
 func (c *HTTPController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -93,8 +94,15 @@ func (c *HTTPController) handleRedirect(w http.ResponseWriter, r *http.Request) 
 
 	originalURL, err := c.service.Expand(shortID)
 	if err != nil {
+		if usecase.IsURLDeleted(err) {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.WriteHeader(http.StatusGone)
+			w.Write([]byte("URL has been deleted"))
+			return
+		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		http.Error(w, "Error expand short url", http.StatusBadRequest)
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("URL not found"))
 		return
 	}
 
@@ -204,4 +212,30 @@ func (c *HTTPController) handleGetUserURLs(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(urls)
+}
+
+func (c *HTTPController) handleDeleteUserURLs(w http.ResponseWriter, r *http.Request) {
+	userID, ok := appmiddleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var shortIDs []string
+	if err := json.NewDecoder(r.Body).Decode(&shortIDs); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if len(shortIDs) == 0 {
+		http.Error(w, "Empty short IDs list", http.StatusBadRequest)
+		return
+	}
+
+	if err := c.service.DeleteUserURLs(userID, shortIDs); err != nil {
+		http.Error(w, "Failed to queue deletion request", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
