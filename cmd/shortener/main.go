@@ -105,6 +105,9 @@ func main() {
 			Msg("Failed to gracefully shutdown the server")
 	}
 
+	// Закрываем сервис удаления URL
+	service.Close()
+
 	if fileStorage, ok := store.(*storage.InMemoryStorage); ok {
 		if err := fileStorage.Backup(); err != nil {
 			logger.Info().

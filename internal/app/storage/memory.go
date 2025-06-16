@@ -96,7 +96,6 @@ func (s *InMemoryStorage) SaveBatch(ctx context.Context, urls []usecase.URLPair)
 
 		// Связываем с пользователем если указан userID
 		if url.UserID != "" {
-			// Проверяем, не связан ли уже этот URL с пользователем
 			found := false
 			if shortIDs, exists := s.users[url.UserID]; exists {
 				for _, existingShortID := range shortIDs {
@@ -141,4 +140,28 @@ func (s *InMemoryStorage) GetUserURLs(ctx context.Context, userID string) ([]use
 	}
 
 	return urls, nil
+}
+
+// BatchDeleteUserURLs помечает URL пользователя как удаленные
+func (s *InMemoryStorage) BatchDeleteUserURLs(ctx context.Context, userID string, shortIDs []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, shortID := range shortIDs {
+		if url, exists := s.urls[shortID]; exists {
+			if urlWithUser, hasUser := s.users[userID]; hasUser {
+				for i, userURL := range urlWithUser {
+					if userURL == shortID {
+						// Удаляем из списка пользователя
+						s.users[userID] = append(urlWithUser[:i], urlWithUser[i+1:]...)
+						break
+					}
+				}
+			}
+			delete(s.urls, shortID)
+			_ = url
+		}
+	}
+
+	return nil
 }

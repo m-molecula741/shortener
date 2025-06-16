@@ -7,6 +7,7 @@ type URLStorage interface {
 	Get(shortID string) (string, error)
 	SaveBatch(ctx context.Context, urls []URLPair) error
 	GetUserURLs(ctx context.Context, userID string) ([]UserURL, error)
+	BatchDeleteUserURLs(ctx context.Context, userID string, shortIDs []string) error
 }
 
 type DatabasePinger interface {

@@ -13,12 +13,13 @@ import (
 const testBaseURL = "http://localhost:8080/"
 
 type MockURLStorage struct {
-	SaveFunc           func(shortID, url string) error
-	GetFunc            func(shortID string) (string, error)
-	SaveBatchFunc      func(ctx context.Context, urls []URLPair) error
-	GetUserURLsFunc    func(ctx context.Context, userID string) ([]UserURL, error)
-	SaveBatchCallCount int
-	LastSavedBatch     []URLPair
+	SaveFunc                func(shortID, url string) error
+	GetFunc                 func(shortID string) (string, error)
+	SaveBatchFunc           func(ctx context.Context, urls []URLPair) error
+	GetUserURLsFunc         func(ctx context.Context, userID string) ([]UserURL, error)
+	BatchDeleteUserURLsFunc func(ctx context.Context, userID string, shortIDs []string) error
+	SaveBatchCallCount      int
+	LastSavedBatch          []URLPair
 }
 
 func (m *MockURLStorage) Save(shortID, url string) error {
@@ -49,6 +50,13 @@ func (m *MockURLStorage) GetUserURLs(ctx context.Context, userID string) ([]User
 		return m.GetUserURLsFunc(ctx, userID)
 	}
 	return nil, nil
+}
+
+func (m *MockURLStorage) BatchDeleteUserURLs(ctx context.Context, userID string, shortIDs []string) error {
+	if m.BatchDeleteUserURLsFunc != nil {
+		return m.BatchDeleteUserURLsFunc(ctx, userID, shortIDs)
+	}
+	return nil
 }
 
 // MockDatabasePinger мок для DatabasePinger
