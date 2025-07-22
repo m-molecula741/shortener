@@ -424,3 +424,55 @@ func TestURLService_ShortenWithUser(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkURLService_Shorten(b *testing.B) {
+	storage := &MockURLStorage{
+		SaveFunc: func(shortID, url string) error {
+			return nil
+		},
+	}
+	service := NewURLService(storage, "http://localhost:8080", nil)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = service.Shorten("http://example.com")
+	}
+}
+
+func BenchmarkURLService_Expand(b *testing.B) {
+	storage := &MockURLStorage{
+		SaveFunc: func(shortID, url string) error {
+			return nil
+		},
+		GetFunc: func(shortID string) (string, error) {
+			return "http://example.com", nil
+		},
+	}
+	service := NewURLService(storage, "http://localhost:8080", nil)
+
+	shortURL, _ := service.Shorten("http://example.com")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = service.Expand(shortURL)
+	}
+}
+
+func BenchmarkURLService_ShortenBatch(b *testing.B) {
+	storage := &MockURLStorage{
+		SaveBatchFunc: func(ctx context.Context, urls []URLPair) error {
+			return nil
+		},
+	}
+	service := NewURLService(storage, "http://localhost:8080", nil)
+
+	requests := []BatchShortenRequest{
+		{CorrelationID: "1", OriginalURL: "http://example1.com"},
+		{CorrelationID: "2", OriginalURL: "http://example2.com"},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = service.ShortenBatch(context.Background(), requests)
+	}
+}

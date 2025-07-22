@@ -187,6 +187,11 @@ func (c *HTTPController) handleShortenBatch(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(responses)
 }
 
+type respPair struct {
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+}
+
 func (c *HTTPController) handleGetUserURLs(w http.ResponseWriter, r *http.Request) {
 	// Получаем ID пользователя из контекста (middleware уже добавил его)
 	userID, ok := appmiddleware.GetUserIDFromContext(r.Context())
@@ -208,10 +213,19 @@ func (c *HTTPController) handleGetUserURLs(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Преобразуем в нужный формат
+	response := make([]respPair, len(urls))
+	for i, url := range urls {
+		response[i] = respPair{
+			ShortURL:    url.ShortURL,
+			OriginalURL: url.OriginalURL,
+		}
+	}
+
 	// Возвращаем URL пользователя
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(urls)
+	json.NewEncoder(w).Encode(response)
 }
 
 func (c *HTTPController) handleDeleteUserURLs(w http.ResponseWriter, r *http.Request) {

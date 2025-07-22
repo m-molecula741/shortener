@@ -7,8 +7,10 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/m-molecula741/shortener/internal/app/middleware"
 	"github.com/m-molecula741/shortener/internal/app/usecase"
 	"github.com/stretchr/testify/assert"
@@ -532,5 +534,61 @@ func TestHTTPController_handleGetUserURLs(t *testing.T) {
 				assert.Equal(t, tt.expectedURLs, urls)
 			}
 		})
+	}
+}
+
+func BenchmarkHandleShorten(b *testing.B) {
+	service := &MockURLService{
+		ShortenFunc: func(url string) (string, error) {
+			return "http://localhost:8080/abc123", nil
+		},
+	}
+	auth := &middleware.AuthMiddleware{}
+	ctrl := NewHTTPController(service, auth)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		body := strings.NewReader("http://example.com")
+		r := httptest.NewRequest(http.MethodPost, "/", body)
+		ctrl.handleShorten(w, r)
+	}
+}
+
+func BenchmarkHandleShortenJSON(b *testing.B) {
+	service := &MockURLService{
+		ShortenFunc: func(url string) (string, error) {
+			return "http://localhost:8080/abc123", nil
+		},
+	}
+	auth := &middleware.AuthMiddleware{}
+	ctrl := NewHTTPController(service, auth)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		reqBody := `{"url": "http://example.com"}`
+		r := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(reqBody))
+		ctrl.handleShortenJSON(w, r)
+	}
+}
+
+func BenchmarkHandleRedirect(b *testing.B) {
+	service := &MockURLService{
+		ExpandFunc: func(shortID string) (string, error) {
+			return "http://example.com", nil
+		},
+	}
+	auth := &middleware.AuthMiddleware{}
+	ctrl := NewHTTPController(service, auth)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/abc123", nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("shortID", "abc123")
+		r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+		ctrl.handleRedirect(w, r)
 	}
 }
