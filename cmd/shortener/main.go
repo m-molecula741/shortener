@@ -21,6 +21,15 @@ func main() {
 
 	cfg := config.NewConfig()
 
+	// Инициализируем middleware аутентификации
+	auth, err := middleware.NewAuthMiddleware("secret-key-for-auth")
+	if err != nil {
+		logger.Info().
+			Err(err).
+			Msg("Failed to initialize auth middleware")
+		os.Exit(1)
+	}
+
 	var store usecase.URLStorage
 	var dbPinger usecase.DatabasePinger
 
@@ -37,7 +46,13 @@ func main() {
 		store = pgStorage
 		dbPinger = pgStorage // PostgreSQL поддерживает ping
 
-		defer pgStorage.Close()
+		defer func() {
+			if err := pgStorage.Close(); err != nil {
+				logger.Info().
+					Err(err).
+					Msg("Failed to close PostgreSQL connection")
+			}
+		}()
 
 		logger.Info().Msg("Using PostgreSQL storage")
 	} else {
@@ -56,7 +71,7 @@ func main() {
 	}
 
 	service := usecase.NewURLService(store, cfg.BaseURL, dbPinger)
-	httpController := controller.NewHTTPController(service)
+	httpController := controller.NewHTTPController(service, auth)
 
 	server := &http.Server{
 		Addr:    cfg.ServerAddress,
@@ -79,17 +94,19 @@ func main() {
 	}()
 
 	<-done
-	logger.Info().Msg("Server is shutting down...")
+	logger.Info().Msg("Server stopped")
 
-	// Graceful shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
 		logger.Info().
 			Err(err).
-			Msg("Server shutdown error")
+			Msg("Failed to gracefully shutdown the server")
 	}
+
+	// Закрываем сервис удаления URL
+	service.Close()
 
 	if fileStorage, ok := store.(*storage.InMemoryStorage); ok {
 		if err := fileStorage.Backup(); err != nil {
