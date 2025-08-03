@@ -7,8 +7,10 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/m-molecula741/shortener/internal/app/middleware"
 	"github.com/m-molecula741/shortener/internal/app/usecase"
 	"github.com/stretchr/testify/assert"
@@ -532,5 +534,160 @@ func TestHTTPController_handleGetUserURLs(t *testing.T) {
 				assert.Equal(t, tt.expectedURLs, urls)
 			}
 		})
+	}
+}
+
+func BenchmarkHandleShorten(b *testing.B) {
+	// Создаем мок сервиса
+	mockService := &MockURLService{
+		ShortenWithUserFunc: func(ctx context.Context, url, userID string) (string, error) {
+			return "http://localhost:8080/abc123", nil
+		},
+	}
+
+	// Создаем контроллер
+	auth, err := middleware.NewAuthMiddleware("test-key")
+	if err != nil {
+		b.Fatal(err)
+	}
+	controller := NewHTTPController(mockService, auth)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		body := strings.NewReader("http://example.com")
+		r := httptest.NewRequest(http.MethodPost, "/", body)
+		controller.handleShorten(w, r)
+	}
+}
+
+func BenchmarkHandleShortenJSON(b *testing.B) {
+	// Создаем мок сервиса
+	mockService := &MockURLService{
+		ShortenWithUserFunc: func(ctx context.Context, url, userID string) (string, error) {
+			return "http://localhost:8080/abc123", nil
+		},
+	}
+
+	// Создаем контроллер
+	auth, err := middleware.NewAuthMiddleware("test-key")
+	if err != nil {
+		b.Fatal(err)
+	}
+	controller := NewHTTPController(mockService, auth)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		reqBody := `{"url": "http://example.com"}`
+		r := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(reqBody))
+		r.Header.Set("Content-Type", "application/json")
+		controller.handleShortenJSON(w, r)
+	}
+}
+
+func BenchmarkHandleRedirect(b *testing.B) {
+	// Создаем мок сервиса
+	mockService := &MockURLService{
+		ExpandFunc: func(shortID string) (string, error) {
+			return "http://example.com", nil
+		},
+	}
+
+	// Создаем контроллер
+	auth, err := middleware.NewAuthMiddleware("test-key")
+	if err != nil {
+		b.Fatal(err)
+	}
+	controller := NewHTTPController(mockService, auth)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/abc123", nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("shortID", "abc123")
+		r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+		controller.handleRedirect(w, r)
+	}
+}
+
+func BenchmarkHandleShortenBatch(b *testing.B) {
+	// Создаем мок сервиса
+	mockService := &MockURLService{
+		ShortenBatchWithUserFunc: func(ctx context.Context, requests []usecase.BatchShortenRequest, userID string) ([]usecase.BatchShortenResponse, error) {
+			responses := make([]usecase.BatchShortenResponse, len(requests))
+			for i, req := range requests {
+				responses[i] = usecase.BatchShortenResponse{
+					CorrelationID: req.CorrelationID,
+					ShortURL:      "http://localhost:8080/test" + string(rune(i+'1')),
+				}
+			}
+			return responses, nil
+		},
+	}
+
+	// Создаем контроллер
+	auth, err := middleware.NewAuthMiddleware("test-key")
+	if err != nil {
+		b.Fatal(err)
+	}
+	controller := NewHTTPController(mockService, auth)
+
+	// Подготавливаем тестовые данные
+	requests := []usecase.BatchShortenRequest{
+		{CorrelationID: "1", OriginalURL: "http://example1.com"},
+		{CorrelationID: "2", OriginalURL: "http://example2.com"},
+	}
+	reqBody, err := json.Marshal(requests)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(reqBody))
+		r.Header.Set("Content-Type", "application/json")
+		controller.handleShortenBatch(w, r)
+	}
+}
+
+func BenchmarkHandleGetUserURLs(b *testing.B) {
+	// Создаем мок сервиса
+	mockService := &MockURLService{
+		GetUserURLsFunc: func(ctx context.Context, userID string) ([]usecase.UserURL, error) {
+			return []usecase.UserURL{
+				{
+					ShortURL:    "http://localhost:8080/abc123",
+					OriginalURL: "http://example.com",
+				},
+				{
+					ShortURL:    "http://localhost:8080/def456",
+					OriginalURL: "http://another.com",
+				},
+			}, nil
+		},
+	}
+
+	// Создаем контроллер
+	auth, err := middleware.NewAuthMiddleware("test-key")
+	if err != nil {
+		b.Fatal(err)
+	}
+	controller := NewHTTPController(mockService, auth)
+
+	// Создаем тестовую куку
+	cookie := &http.Cookie{
+		Name:  "user_id",
+		Value: "test-user-id",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+		r.AddCookie(cookie)
+		controller.handleGetUserURLs(w, r)
 	}
 }

@@ -161,11 +161,30 @@ func (s *URLService) Close() {
 	s.workerWG.Wait()
 }
 
+// Добавляем пул для строк
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return new(strings.Builder)
+	},
+}
+
 func (s *URLService) Shorten(url string) (string, error) {
 	shortID, err := generateShortID()
 	if err != nil {
 		return "", err
 	}
+
+	// Используем пул для построения URL
+	builder := bufferPool.Get().(*strings.Builder)
+	builder.Reset()
+	defer bufferPool.Put(builder)
+
+	builder.WriteString(s.baseURL)
+	if !strings.HasSuffix(s.baseURL, "/") {
+		builder.WriteString("/")
+	}
+	builder.WriteString(shortID)
+	shortURL := builder.String()
 
 	if err := s.storage.Save(shortID, url); err != nil {
 		if conflictErr, isConflict := IsURLConflict(err); isConflict {
@@ -176,7 +195,7 @@ func (s *URLService) Shorten(url string) (string, error) {
 		return "", err
 	}
 
-	return s.baseURL + shortID, nil
+	return shortURL, nil
 }
 
 // ShortenWithUser сокращает URL и связывает его с пользователем
@@ -214,12 +233,22 @@ func (s *URLService) Expand(shortID string) (string, error) {
 	return s.storage.Get(shortID)
 }
 
+// Оптимизируем генерацию ID
+var idPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 6) // 6 байт дадут 8 символов в base64
+	},
+}
+
 func generateShortID() (string, error) {
-	b := make([]byte, 6)
+	b := idPool.Get().([]byte)
+	defer idPool.Put(b)
+
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	return base64.URLEncoding.EncodeToString(b)[:8], nil
+
+	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(b)[:8], nil
 }
 
 // PingDB проверяет соединение с базой данных

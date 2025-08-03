@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -20,6 +22,13 @@ func main() {
 	logger.Init()
 
 	cfg := config.NewConfig()
+
+	go func() {
+		log.Println("pprof server started at http://localhost:6060/debug/pprof/")
+		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
+			log.Println("pprof server error:", err)
+		}
+	}()
 
 	// Инициализируем middleware аутентификации
 	auth, err := middleware.NewAuthMiddleware("secret-key-for-auth")

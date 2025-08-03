@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -16,9 +17,21 @@ type PostgresStorage struct {
 }
 
 func NewPostgresStorage(dsn string) (*PostgresStorage, error) {
-	pool, err := pgxpool.New(context.Background(), dsn)
+	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create connection pool: %w", err)
+		return nil, err
+	}
+
+	// Оптимизируем настройки пула
+	config.MaxConns = 10                       // Ограничиваем максимальное количество соединений
+	config.MinConns = 2                        // Минимальное количество соединений
+	config.MaxConnLifetime = 1 * time.Hour     // Максимальное время жизни соединения
+	config.MaxConnIdleTime = 30 * time.Minute  // Максимальное время простоя соединения
+	config.HealthCheckPeriod = 1 * time.Minute // Период проверки здоровья соединений
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		return nil, err
 	}
 
 	storage := &PostgresStorage{
