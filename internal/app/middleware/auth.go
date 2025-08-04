@@ -1,3 +1,4 @@
+// Package middleware предоставляет middleware компоненты для HTTP сервера
 package middleware
 
 import (
@@ -12,11 +13,13 @@ import (
 	"github.com/google/uuid"
 )
 
+// Константы для аутентификации
 const (
 	CookieName       = "user_id"
 	CookieExpiration = 24 * time.Hour
 )
 
+// Ошибки для аутентификации
 var (
 	ErrInvalidCookie = errors.New("invalid cookie")
 )

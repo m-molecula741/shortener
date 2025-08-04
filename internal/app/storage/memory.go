@@ -83,6 +83,7 @@ func (s *InMemoryStorage) Backup() error {
 	return nil
 }
 
+// Ошибки для хранилища
 var (
 	ErrNotFound = errors.New("url not found")
 )

@@ -1,3 +1,4 @@
+// Package config предоставляет конфигурацию для приложения
 package config
 
 import (
@@ -5,10 +6,12 @@ import (
 	"os"
 )
 
+// Константы для конфигурации
 const (
 	defaultStorageFile = "urls.json"
 )
 
+// Config представляет конфигурацию приложения
 type Config struct {
 	ServerAddress   string // адрес HTTP-сервера
 	BaseURL         string // базовый адрес для сокращенных URL
@@ -16,6 +19,7 @@ type Config struct {
 	DatabaseDSN     string // строка подключения к базе данных
 }
 
+// NewConfig создает новую конфигурацию
 func NewConfig() *Config {
 	cfg := &Config{}
 
