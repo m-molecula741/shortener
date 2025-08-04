@@ -1,3 +1,4 @@
+// Package storage предоставляет различные реализации хранилища URL
 package storage
 
 import (
@@ -10,6 +11,7 @@ import (
 	"github.com/m-molecula741/shortener/internal/app/usecase"
 )
 
+// InMemoryStorage представляет хранилище URL в памяти
 type InMemoryStorage struct {
 	mu     sync.Mutex
 	urls   map[string]string
@@ -17,6 +19,7 @@ type InMemoryStorage struct {
 	backup *FileBackup
 }
 
+// NewInMemoryStorage создает новый экземпляр InMemoryStorage
 func NewInMemoryStorage(filePath string) (*InMemoryStorage, error) {
 	backup := NewFileBackup(filePath)
 
@@ -37,6 +40,7 @@ func NewInMemoryStorage(filePath string) (*InMemoryStorage, error) {
 	return s, nil
 }
 
+// Save сохраняет URL в памяти
 func (s *InMemoryStorage) Save(shortID, url string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -52,6 +56,7 @@ func (s *InMemoryStorage) Save(shortID, url string) error {
 	return nil
 }
 
+// Get получает URL из памяти
 func (s *InMemoryStorage) Get(shortID string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

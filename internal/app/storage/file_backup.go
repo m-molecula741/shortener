@@ -1,3 +1,4 @@
+// Package storage предоставляет различные реализации хранилища URL
 package storage
 
 import (
@@ -6,17 +7,20 @@ import (
 	"os"
 )
 
+// URLRecord представляет структуру для хранения URL в файле
 type URLRecord struct {
 	UUID        string `json:"uuid"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
 }
 
+// FileBackup реализует файловое хранилище URL с возможностью бэкапа
 type FileBackup struct {
 	filePath string
 	records  map[string]URLRecord // ключ - shortURL для быстрого поиска существующих записей
 }
 
+// NewFileBackup создает новый экземпляр FileBackup
 func NewFileBackup(filePath string) *FileBackup {
 	return &FileBackup{
 		filePath: filePath,
@@ -24,12 +28,13 @@ func NewFileBackup(filePath string) *FileBackup {
 	}
 }
 
+// Clear очищает все записи в памяти
 func (fb *FileBackup) Clear() error {
 	fb.records = make(map[string]URLRecord)
 	return nil
 }
 
-// SaveURL сохраняет URL в память
+// SaveURL сохраняет URL в память и в файл
 func (fb *FileBackup) SaveURL(uuid, shortURL, originalURL string) error {
 	// Проверяем, существует ли уже запись с таким shortURL
 	if existingRecord, exists := fb.records[shortURL]; exists {
@@ -74,6 +79,7 @@ func (fb *FileBackup) saveToFile() error {
 	return nil
 }
 
+// LoadURLs загружает все URL из файла в память
 func (fb *FileBackup) LoadURLs() (map[string]string, error) {
 	data, err := os.ReadFile(fb.filePath)
 	if err != nil {

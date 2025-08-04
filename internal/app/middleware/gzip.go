@@ -1,3 +1,4 @@
+// Package middleware предоставляет middleware компоненты для HTTP сервера
 package middleware
 
 import (
@@ -6,11 +7,13 @@ import (
 	"strings"
 )
 
+// compressibleTypes содержит MIME-типы, для которых включается сжатие
 var compressibleTypes = map[string]bool{
 	"application/json": true,
 	"text/html":        true,
 }
 
+// GzipMiddleware обеспечивает сжатие ответов с помощью gzip
 func GzipMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 1. Обработка входящего gzip
@@ -42,6 +45,7 @@ func GzipMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// gzipResponseWriter реализует интерфейс http.ResponseWriter для сжатия ответов
 type gzipResponseWriter struct {
 	http.ResponseWriter
 	gz          *gzip.Writer
@@ -50,6 +54,7 @@ type gzipResponseWriter struct {
 	acceptsGzip bool
 }
 
+// Write реализует интерфейс io.Writer для сжатия данных
 func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 	if !w.wroteHeader {
 		w.WriteHeader(http.StatusOK)
@@ -64,6 +69,7 @@ func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
+// WriteHeader устанавливает статус код и необходимые заголовки для сжатия
 func (w *gzipResponseWriter) WriteHeader(statusCode int) {
 	if w.wroteHeader {
 		return
@@ -93,12 +99,14 @@ func (w *gzipResponseWriter) WriteHeader(statusCode int) {
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
+// Close закрывает gzip.Writer если он был создан
 func (w *gzipResponseWriter) Close() {
 	if w.gz != nil {
 		w.gz.Close()
 	}
 }
 
+// shouldCompressContentType проверяет, нужно ли сжимать контент данного типа
 func shouldCompressContentType(contentType string) bool {
 	for typ := range compressibleTypes {
 		if strings.Contains(contentType, typ) {

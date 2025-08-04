@@ -1,3 +1,4 @@
+// Package usecase содержит бизнес-логику сервиса сокращения URL
 package usecase
 
 import (
@@ -15,6 +16,7 @@ type DeleteRequest struct {
 	ShortIDs []string
 }
 
+// URLService реализует бизнес-логику работы с URL
 type URLService struct {
 	storage  URLStorage
 	baseURL  string
@@ -25,6 +27,7 @@ type URLService struct {
 	workerWG   sync.WaitGroup
 }
 
+// NewURLService создает новый экземпляр URLService с настроенными воркерами для удаления
 func NewURLService(storage URLStorage, baseURL string, dbPinger DatabasePinger) *URLService {
 	if !strings.HasSuffix(baseURL, "/") {
 		baseURL = baseURL + "/"
@@ -168,6 +171,7 @@ var bufferPool = sync.Pool{
 	},
 }
 
+// Shorten сокращает URL без привязки к пользователю
 func (s *URLService) Shorten(url string) (string, error) {
 	shortID, err := generateShortID()
 	if err != nil {
@@ -229,6 +233,7 @@ func (s *URLService) ShortenWithUser(ctx context.Context, url, userID string) (s
 	return shortURL, nil
 }
 
+// Expand возвращает оригинальный URL по короткому идентификатору
 func (s *URLService) Expand(shortID string) (string, error) {
 	return s.storage.Get(shortID)
 }

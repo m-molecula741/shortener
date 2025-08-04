@@ -1,3 +1,4 @@
+// Package storage предоставляет различные реализации хранилища URL
 package storage
 
 import (
@@ -12,10 +13,12 @@ import (
 	"github.com/m-molecula741/shortener/internal/app/usecase"
 )
 
+// PostgresStorage реализует хранение URL в PostgreSQL
 type PostgresStorage struct {
 	pool *pgxpool.Pool
 }
 
+// NewPostgresStorage создает новый экземпляр PostgresStorage с оптимизированными настройками пула соединений
 func NewPostgresStorage(dsn string) (*PostgresStorage, error) {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
