@@ -245,9 +245,10 @@ var idPool = sync.Pool{
 	},
 }
 
+// generateShortID генерирует короткий идентификатор
 func generateShortID() (string, error) {
 	b := idPool.Get().([]byte)
-	defer idPool.Put(b)
+	defer idPool.Put(b) //lint:ignore SA6002 аргумент []byte передаётся по ссылке, аллокаций нет
 
 	if _, err := rand.Read(b); err != nil {
 		return "", err
