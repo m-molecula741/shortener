@@ -7,7 +7,9 @@ import (
 	"strings"
 )
 
-// compressibleTypes содержит MIME-типы, для которых включается сжатие
+// compressibleTypes содержит MIME-типы, для которых включается gzip сжатие.
+// Эта карта используется для определения, следует ли сжимать ответы сервера
+// и автоматически распаковывать входящие gzip-сжатые запросы от клиентов.
 var compressibleTypes = map[string]bool{
 	"application/json": true,
 	"text/html":        true,

@@ -3,7 +3,11 @@ package usecase
 
 import "errors"
 
-// ErrURLConflict представляет ошибку при попытке сохранить уже существующий URL
+// ErrURLConflict представляет ошибку при попытке сохранить уже существующий URL.
+// Ошибка возникает когда:
+// - URL уже был сохранен ранее и найден дубликат в базе данных
+// - При попытке создать новый короткий URL для уже существующего оригинального URL
+// - Во время операций Save() и SaveBatch() при нарушении уникальности по original_url
 type ErrURLConflict struct {
 	ExistingShortURL string
 }

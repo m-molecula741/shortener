@@ -238,22 +238,13 @@ func (s *URLService) Expand(shortID string) (string, error) {
 	return s.storage.Get(shortID)
 }
 
-// Оптимизируем генерацию ID
-var idPool = sync.Pool{
-	New: func() interface{} {
-		return make([]byte, 6) // 6 байт дадут 8 символов в base64
-	},
-}
-
 // generateShortID генерирует короткий идентификатор
 func generateShortID() (string, error) {
-	b := idPool.Get().([]byte)
-	defer idPool.Put(b) //lint:ignore SA6002 аргумент []byte передаётся по ссылке, аллокаций нет
-
+	// Создаем фиксированный буфер каждый раз
+	b := make([]byte, 6)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-
 	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(b)[:8], nil
 }
 

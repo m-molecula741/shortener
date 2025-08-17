@@ -23,12 +23,15 @@ func main() {
 
 	cfg := config.NewConfig()
 
-	go func() {
-		log.Println("pprof server started at http://localhost:6060/debug/pprof/")
-		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
-			log.Println("pprof server error:", err)
-		}
-	}()
+	// Запускаем pprof только если включен debug режим
+	if cfg.EnablePprof {
+		go func() {
+			log.Println("pprof server started at http://localhost:6060/debug/pprof/")
+			if err := http.ListenAndServe("localhost:6060", nil); err != nil {
+				log.Println("pprof server error:", err)
+			}
+		}()
+	}
 
 	// Инициализируем middleware аутентификации
 	auth, err := middleware.NewAuthMiddleware("secret-key-for-auth")
@@ -44,7 +47,7 @@ func main() {
 
 	if cfg.DatabaseDSN != "" {
 		// Используем PostgreSQL как основное хранилище
-		pgStorage, err := storage.NewPostgresStorage(cfg.DatabaseDSN)
+		pgStorage, err := storage.NewPostgresStorage(cfg.DatabaseDSN, nil)
 		if err != nil {
 			logger.Info().
 				Err(err).
@@ -79,7 +82,8 @@ func main() {
 		logger.Info().Msg("Using file storage")
 	}
 
-	service := usecase.NewURLService(store, cfg.BaseURL, dbPinger)
+	urlService := usecase.NewURLService(store, cfg.BaseURL, dbPinger)
+	var service controller.URLService = urlService
 	httpController := controller.NewHTTPController(service, auth)
 
 	server := &http.Server{
@@ -115,7 +119,7 @@ func main() {
 	}
 
 	// Закрываем сервис удаления URL
-	service.Close()
+	urlService.Close()
 
 	if fileStorage, ok := store.(*storage.InMemoryStorage); ok {
 		if err := fileStorage.Backup(); err != nil {

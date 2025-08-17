@@ -13,23 +13,39 @@ import (
 	"github.com/m-molecula741/shortener/internal/app/usecase"
 )
 
+// PoolConfig содержит настройки пула соединений PostgreSQL
+type PoolConfig struct {
+	MaxConns        int32
+	MinConns        int32
+	MaxConnLifetime time.Duration
+	MaxConnIdleTime time.Duration
+}
+
 // PostgresStorage реализует хранение URL в PostgreSQL
 type PostgresStorage struct {
 	pool *pgxpool.Pool
 }
 
 // NewPostgresStorage создает новый экземпляр PostgresStorage с оптимизированными настройками пула соединений
-func NewPostgresStorage(dsn string) (*PostgresStorage, error) {
+func NewPostgresStorage(dsn string, poolCfg *PoolConfig) (*PostgresStorage, error) {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, err
 	}
 
-	// Оптимизируем настройки пула
-	config.MaxConns = 10                       // Ограничиваем максимальное количество соединений
-	config.MinConns = 2                        // Минимальное количество соединений
-	config.MaxConnLifetime = 1 * time.Hour     // Максимальное время жизни соединения
-	config.MaxConnIdleTime = 30 * time.Minute  // Максимальное время простоя соединения
+	// Применяем настройки пула, если они переданы
+	if poolCfg != nil {
+		config.MaxConns = poolCfg.MaxConns
+		config.MinConns = poolCfg.MinConns
+		config.MaxConnLifetime = poolCfg.MaxConnLifetime
+		config.MaxConnIdleTime = poolCfg.MaxConnIdleTime
+	} else {
+		// Дефолтные оптимизированные настройки пула
+		config.MaxConns = 10                      // Ограничиваем максимальное количество соединений
+		config.MinConns = 2                       // Минимальное количество соединений
+		config.MaxConnLifetime = 1 * time.Hour    // Максимальное время жизни соединения
+		config.MaxConnIdleTime = 30 * time.Minute // Максимальное время простоя соединения
+	}
 	config.HealthCheckPeriod = 1 * time.Minute // Период проверки здоровья соединений
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)

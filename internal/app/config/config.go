@@ -4,6 +4,7 @@ package config
 import (
 	"flag"
 	"os"
+	"strconv"
 )
 
 // Константы для конфигурации
@@ -17,6 +18,7 @@ type Config struct {
 	BaseURL         string // базовый адрес для сокращенных URL
 	StorageFilePath string // путь к файлу для хранения URL
 	DatabaseDSN     string // строка подключения к базе данных
+	EnablePprof     bool   // включить профилирование pprof
 }
 
 // NewConfig создает новую конфигурацию
@@ -27,6 +29,7 @@ func NewConfig() *Config {
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080/", "base URL for shortened URLs")
 	flag.StringVar(&cfg.StorageFilePath, "f", defaultStorageFile, "file storage path")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "database connection string")
+	flag.BoolVar(&cfg.EnablePprof, "pprof", false, "enable pprof profiling")
 
 	flag.Parse()
 
@@ -44,6 +47,12 @@ func NewConfig() *Config {
 
 	if envDatabaseDSN := os.Getenv("DATABASE_DSN"); envDatabaseDSN != "" {
 		cfg.DatabaseDSN = envDatabaseDSN
+	}
+
+	if envPprof := os.Getenv("ENABLE_PPROF"); envPprof != "" {
+		if enabled, err := strconv.ParseBool(envPprof); err == nil {
+			cfg.EnablePprof = enabled
+		}
 	}
 
 	return cfg
