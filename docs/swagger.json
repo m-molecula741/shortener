@@ -1,0 +1,351 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "contact": {}
+    },
+    "paths": {
+        "/": {
+            "post": {
+                "description": "Принимает URL в текстовом формате и возвращает сокращенную версию",
+                "consumes": [
+                    "text/plain"
+                ],
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "URLs"
+                ],
+                "summary": "Сокращение URL (текстовый формат)",
+                "parameters": [
+                    {
+                        "description": "URL для сокращения",
+                        "name": "url",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Сокращенный URL",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "URL уже существует",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/shorten": {
+            "post": {
+                "description": "Принимает URL в формате JSON и возвращает сокращенную версию",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "URLs"
+                ],
+                "summary": "Сокращение URL (JSON формат)",
+                "parameters": [
+                    {
+                        "description": "URL для сокращения",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controller.ShortenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Сокращенный URL",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ShortenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "URL уже существует",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ShortenResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/shorten/batch": {
+            "post": {
+                "description": "Принимает массив URL и возвращает их сокращенные версии",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "URLs"
+                ],
+                "summary": "Пакетное сокращение URL",
+                "parameters": [
+                    {
+                        "description": "Массив URL для сокращения",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/usecase.BatchShortenRequest"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Массив сокращенных URL",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/usecase.BatchShortenResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/urls": {
+            "get": {
+                "security": [
+                    {
+                        "Cookie": []
+                    }
+                ],
+                "description": "Возвращает все сокращенные URL текущего пользователя",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Получение URL пользователя",
+                "responses": {
+                    "200": {
+                        "description": "Список URL пользователя",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/usecase.UserURL"
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "URL не найдены"
+                    },
+                    "401": {
+                        "description": "Не авторизован",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "Cookie": []
+                    }
+                ],
+                "description": "Удаляет указанные URL пользователя",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Удаление URL пользователя",
+                "parameters": [
+                    {
+                        "description": "Массив коротких идентификаторов для удаления",
+                        "name": "shortIDs",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Запрос на удаление принят"
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Не авторизован",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/ping": {
+            "get": {
+                "description": "Проверяет подключение к базе данных",
+                "tags": [
+                    "System"
+                ],
+                "summary": "Проверка работоспособности",
+                "responses": {
+                    "200": {
+                        "description": "БД доступна",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Ошибка подключения к БД",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/{shortID}": {
+            "get": {
+                "description": "Перенаправляет на оригинальный URL по его короткому идентификатору",
+                "tags": [
+                    "URLs"
+                ],
+                "summary": "Получение оригинального URL",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Короткий идентификатор URL",
+                        "name": "shortID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "307": {
+                        "description": "Перенаправление",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "URL не найден",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "410": {
+                        "description": "URL был удален",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "controller.ShortenRequest": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "description": "URL для сокращения",
+                    "type": "string",
+                    "example": "https://practicum.yandex.ru"
+                }
+            }
+        },
+        "controller.ShortenResponse": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "description": "Сокращенный URL",
+                    "type": "string",
+                    "example": "http://localhost:8080/abcd1234"
+                }
+            }
+        },
+        "usecase.BatchShortenRequest": {
+            "type": "object",
+            "properties": {
+                "correlation_id": {
+                    "type": "string"
+                },
+                "original_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "usecase.BatchShortenResponse": {
+            "type": "object",
+            "properties": {
+                "correlation_id": {
+                    "type": "string"
+                },
+                "short_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "usecase.UserURL": {
+            "type": "object",
+            "properties": {
+                "original_url": {
+                    "type": "string"
+                },
+                "short_url": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

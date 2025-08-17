@@ -1,3 +1,4 @@
+// Package usecase содержит бизнес-логику сервиса сокращения URL
 package usecase
 
 import (
@@ -15,6 +16,7 @@ type DeleteRequest struct {
 	ShortIDs []string
 }
 
+// URLService реализует бизнес-логику работы с URL
 type URLService struct {
 	storage  URLStorage
 	baseURL  string
@@ -25,6 +27,7 @@ type URLService struct {
 	workerWG   sync.WaitGroup
 }
 
+// NewURLService создает новый экземпляр URLService с настроенными воркерами для удаления
 func NewURLService(storage URLStorage, baseURL string, dbPinger DatabasePinger) *URLService {
 	if !strings.HasSuffix(baseURL, "/") {
 		baseURL = baseURL + "/"
@@ -161,11 +164,31 @@ func (s *URLService) Close() {
 	s.workerWG.Wait()
 }
 
+// Добавляем пул для строк
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return new(strings.Builder)
+	},
+}
+
+// Shorten сокращает URL без привязки к пользователю
 func (s *URLService) Shorten(url string) (string, error) {
 	shortID, err := generateShortID()
 	if err != nil {
 		return "", err
 	}
+
+	// Используем пул для построения URL
+	builder := bufferPool.Get().(*strings.Builder)
+	builder.Reset()
+	defer bufferPool.Put(builder)
+
+	builder.WriteString(s.baseURL)
+	if !strings.HasSuffix(s.baseURL, "/") {
+		builder.WriteString("/")
+	}
+	builder.WriteString(shortID)
+	shortURL := builder.String()
 
 	if err := s.storage.Save(shortID, url); err != nil {
 		if conflictErr, isConflict := IsURLConflict(err); isConflict {
@@ -176,7 +199,7 @@ func (s *URLService) Shorten(url string) (string, error) {
 		return "", err
 	}
 
-	return s.baseURL + shortID, nil
+	return shortURL, nil
 }
 
 // ShortenWithUser сокращает URL и связывает его с пользователем
@@ -210,16 +233,19 @@ func (s *URLService) ShortenWithUser(ctx context.Context, url, userID string) (s
 	return shortURL, nil
 }
 
+// Expand возвращает оригинальный URL по короткому идентификатору
 func (s *URLService) Expand(shortID string) (string, error) {
 	return s.storage.Get(shortID)
 }
 
+// generateShortID генерирует короткий идентификатор
 func generateShortID() (string, error) {
+	// Создаем фиксированный буфер каждый раз
 	b := make([]byte, 6)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	return base64.URLEncoding.EncodeToString(b)[:8], nil
+	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(b)[:8], nil
 }
 
 // PingDB проверяет соединение с базой данных

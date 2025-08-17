@@ -1,3 +1,4 @@
+// Package controller предоставляет интерфейсы для контроллеров
 package controller
 
 import (
@@ -6,6 +7,7 @@ import (
 	"github.com/m-molecula741/shortener/internal/app/usecase"
 )
 
+// URLService определяет интерфейс для сервиса URL
 type URLService interface {
 	Shorten(url string) (string, error)
 	ShortenWithUser(ctx context.Context, url, userID string) (string, error)

@@ -1,0 +1,226 @@
+definitions:
+  controller.ShortenRequest:
+    properties:
+      url:
+        description: URL для сокращения
+        example: https://practicum.yandex.ru
+        type: string
+    type: object
+  controller.ShortenResponse:
+    properties:
+      result:
+        description: Сокращенный URL
+        example: http://localhost:8080/abcd1234
+        type: string
+    type: object
+  usecase.BatchShortenRequest:
+    properties:
+      correlation_id:
+        type: string
+      original_url:
+        type: string
+    type: object
+  usecase.BatchShortenResponse:
+    properties:
+      correlation_id:
+        type: string
+      short_url:
+        type: string
+    type: object
+  usecase.UserURL:
+    properties:
+      original_url:
+        type: string
+      short_url:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /:
+    post:
+      consumes:
+      - text/plain
+      description: Принимает URL в текстовом формате и возвращает сокращенную версию
+      parameters:
+      - description: URL для сокращения
+        in: body
+        name: url
+        required: true
+        schema:
+          type: string
+      produces:
+      - text/plain
+      responses:
+        "201":
+          description: Сокращенный URL
+          schema:
+            type: string
+        "400":
+          description: Неверный запрос
+          schema:
+            type: string
+        "409":
+          description: URL уже существует
+          schema:
+            type: string
+      summary: Сокращение URL (текстовый формат)
+      tags:
+      - URLs
+  /{shortID}:
+    get:
+      description: Перенаправляет на оригинальный URL по его короткому идентификатору
+      parameters:
+      - description: Короткий идентификатор URL
+        in: path
+        name: shortID
+        required: true
+        type: string
+      responses:
+        "307":
+          description: Перенаправление
+          schema:
+            type: string
+        "404":
+          description: URL не найден
+          schema:
+            type: string
+        "410":
+          description: URL был удален
+          schema:
+            type: string
+      summary: Получение оригинального URL
+      tags:
+      - URLs
+  /api/shorten:
+    post:
+      consumes:
+      - application/json
+      description: Принимает URL в формате JSON и возвращает сокращенную версию
+      parameters:
+      - description: URL для сокращения
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controller.ShortenRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Сокращенный URL
+          schema:
+            $ref: '#/definitions/controller.ShortenResponse'
+        "400":
+          description: Неверный запрос
+          schema:
+            type: string
+        "409":
+          description: URL уже существует
+          schema:
+            $ref: '#/definitions/controller.ShortenResponse'
+      summary: Сокращение URL (JSON формат)
+      tags:
+      - URLs
+  /api/shorten/batch:
+    post:
+      consumes:
+      - application/json
+      description: Принимает массив URL и возвращает их сокращенные версии
+      parameters:
+      - description: Массив URL для сокращения
+        in: body
+        name: request
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/usecase.BatchShortenRequest'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Массив сокращенных URL
+          schema:
+            items:
+              $ref: '#/definitions/usecase.BatchShortenResponse'
+            type: array
+        "400":
+          description: Неверный запрос
+          schema:
+            type: string
+      summary: Пакетное сокращение URL
+      tags:
+      - URLs
+  /api/user/urls:
+    delete:
+      consumes:
+      - application/json
+      description: Удаляет указанные URL пользователя
+      parameters:
+      - description: Массив коротких идентификаторов для удаления
+        in: body
+        name: shortIDs
+        required: true
+        schema:
+          items:
+            type: string
+          type: array
+      responses:
+        "202":
+          description: Запрос на удаление принят
+        "400":
+          description: Неверный запрос
+          schema:
+            type: string
+        "401":
+          description: Не авторизован
+          schema:
+            type: string
+      security:
+      - Cookie: []
+      summary: Удаление URL пользователя
+      tags:
+      - Users
+    get:
+      description: Возвращает все сокращенные URL текущего пользователя
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список URL пользователя
+          schema:
+            items:
+              $ref: '#/definitions/usecase.UserURL'
+            type: array
+        "204":
+          description: URL не найдены
+        "401":
+          description: Не авторизован
+          schema:
+            type: string
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            type: string
+      security:
+      - Cookie: []
+      summary: Получение URL пользователя
+      tags:
+      - Users
+  /ping:
+    get:
+      description: Проверяет подключение к базе данных
+      responses:
+        "200":
+          description: БД доступна
+          schema:
+            type: string
+        "500":
+          description: Ошибка подключения к БД
+          schema:
+            type: string
+      summary: Проверка работоспособности
+      tags:
+      - System
+swagger: "2.0"
