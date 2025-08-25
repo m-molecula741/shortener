@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -18,7 +19,18 @@ import (
 	"github.com/m-molecula741/shortener/internal/app/usecase"
 )
 
+// main является точкой входа приложения.
+// Вся основная логика вынесена в функцию run для корректного завершения с кодом выхода.
 func main() {
+	if err := run(); err != nil {
+		// Используем log.Fatal вместо os.Exit для корректного завершения
+		log.Fatal("Application failed:", err)
+	}
+}
+
+// run содержит основную логику приложения.
+// Возвращает ошибку, если приложение не может быть запущено или корректно завершено.
+func run() error {
 	logger.Init()
 
 	cfg := config.NewConfig()
@@ -36,10 +48,7 @@ func main() {
 	// Инициализируем middleware аутентификации
 	auth, err := middleware.NewAuthMiddleware("secret-key-for-auth")
 	if err != nil {
-		logger.Info().
-			Err(err).
-			Msg("Failed to initialize auth middleware")
-		os.Exit(1)
+		return fmt.Errorf("failed to initialize auth middleware: %w", err)
 	}
 
 	var store usecase.URLStorage
@@ -49,10 +58,7 @@ func main() {
 		// Используем PostgreSQL как основное хранилище
 		pgStorage, err := storage.NewPostgresStorage(cfg.DatabaseDSN, nil)
 		if err != nil {
-			logger.Info().
-				Err(err).
-				Msg("Failed to initialize PostgreSQL storage")
-			os.Exit(1)
+			return fmt.Errorf("failed to initialize PostgreSQL storage: %w", err)
 		}
 
 		store = pgStorage
@@ -70,10 +76,7 @@ func main() {
 	} else {
 		fileStorage, err := storage.NewInMemoryStorage(cfg.StorageFilePath)
 		if err != nil {
-			logger.Info().
-				Err(err).
-				Msg("Failed to initialize file storage")
-			os.Exit(1)
+			return fmt.Errorf("failed to initialize file storage: %w", err)
 		}
 
 		store = fileStorage
@@ -94,19 +97,26 @@ func main() {
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
+	// Канал для передачи ошибок сервера
+	serverErrChan := make(chan error, 1)
+
 	go func() {
 		logger.Info().
 			Str("address", cfg.ServerAddress).
 			Msg("Starting server")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Info().
-				Err(err).
-				Msg("Server error")
-			os.Exit(1)
+			serverErrChan <- fmt.Errorf("server error: %w", err)
 		}
 	}()
 
-	<-done
+	// Ждем либо сигнал завершения, либо ошибку сервера
+	select {
+	case <-done:
+		logger.Info().Msg("Received shutdown signal")
+	case err := <-serverErrChan:
+		return err
+	}
+
 	logger.Info().Msg("Server stopped")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -130,4 +140,5 @@ func main() {
 	}
 
 	logger.Info().Msg("Server stopped")
+	return nil
 }
