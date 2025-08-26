@@ -19,6 +19,34 @@ import (
 	"github.com/m-molecula741/shortener/internal/app/usecase"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
+// printBuildInfo выводит информацию о сборке в stdout
+func printBuildInfo() {
+	version := buildVersion
+	if version == "" {
+		version = "N/A"
+	}
+
+	date := buildDate
+	if date == "" {
+		date = "N/A"
+	}
+
+	commit := buildCommit
+	if commit == "" {
+		commit = "N/A"
+	}
+
+	fmt.Printf("Build version: %s\n", version)
+	fmt.Printf("Build date: %s\n", date)
+	fmt.Printf("Build commit: %s\n", commit)
+}
+
 // main является точкой входа приложения.
 // Вся основная логика вынесена в функцию run для корректного завершения с кодом выхода.
 func main() {
@@ -31,6 +59,9 @@ func main() {
 // run содержит основную логику приложения.
 // Возвращает ошибку, если приложение не может быть запущено или корректно завершено.
 func run() error {
+	// Выводим информацию о сборке
+	printBuildInfo()
+
 	logger.Init()
 
 	cfg := config.NewConfig()
