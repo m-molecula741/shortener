@@ -19,6 +19,9 @@ type Config struct {
 	StorageFilePath string // путь к файлу для хранения URL
 	DatabaseDSN     string // строка подключения к базе данных
 	EnablePprof     bool   // включить профилирование pprof
+	EnableHTTPS     bool   // включить HTTPS
+	CertFile        string // путь к файлу сертификата
+	KeyFile         string // путь к файлу ключа
 }
 
 // NewConfig создает новую конфигурацию
@@ -30,6 +33,9 @@ func NewConfig() *Config {
 	flag.StringVar(&cfg.StorageFilePath, "f", defaultStorageFile, "file storage path")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "database connection string")
 	flag.BoolVar(&cfg.EnablePprof, "pprof", false, "enable pprof profiling")
+	flag.BoolVar(&cfg.EnableHTTPS, "s", false, "enable HTTPS")
+	flag.StringVar(&cfg.CertFile, "cert", "server.crt", "path to certificate file")
+	flag.StringVar(&cfg.KeyFile, "key", "server.key", "path to key file")
 
 	flag.Parse()
 
@@ -53,6 +59,20 @@ func NewConfig() *Config {
 		if enabled, err := strconv.ParseBool(envPprof); err == nil {
 			cfg.EnablePprof = enabled
 		}
+	}
+
+	if envHTTPS := os.Getenv("ENABLE_HTTPS"); envHTTPS != "" {
+		if enabled, err := strconv.ParseBool(envHTTPS); err == nil {
+			cfg.EnableHTTPS = enabled
+		}
+	}
+
+	if envCertFile := os.Getenv("CERT_FILE"); envCertFile != "" {
+		cfg.CertFile = envCertFile
+	}
+
+	if envKeyFile := os.Getenv("KEY_FILE"); envKeyFile != "" {
+		cfg.KeyFile = envKeyFile
 	}
 
 	return cfg
