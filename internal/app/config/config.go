@@ -2,6 +2,7 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
 	"os"
 	"strconv"
@@ -11,6 +12,15 @@ import (
 const (
 	defaultStorageFile = "urls.json"
 )
+
+// JSONConfig представляет структуру JSON файла конфигурации
+type JSONConfig struct {
+	ServerAddress   string `json:"server_address"`
+	BaseURL         string `json:"base_url"`
+	FileStoragePath string `json:"file_storage_path"`
+	DatabaseDSN     string `json:"database_dsn"`
+	EnableHTTPS     bool   `json:"enable_https"`
+}
 
 // Config представляет конфигурацию приложения
 type Config struct {
@@ -22,6 +32,7 @@ type Config struct {
 	EnableHTTPS     bool   // включить HTTPS
 	CertFile        string // путь к файлу сертификата
 	KeyFile         string // путь к файлу ключа
+	ConfigFile      string // путь к файлу конфигурации JSON
 }
 
 // NewConfig создает новую конфигурацию
@@ -36,8 +47,23 @@ func NewConfig() *Config {
 	flag.BoolVar(&cfg.EnableHTTPS, "s", false, "enable HTTPS")
 	flag.StringVar(&cfg.CertFile, "cert", "server.crt", "path to certificate file")
 	flag.StringVar(&cfg.KeyFile, "key", "server.key", "path to key file")
+	flag.StringVar(&cfg.ConfigFile, "c", "", "path to JSON config file")
+	flag.StringVar(&cfg.ConfigFile, "config", "", "path to JSON config file")
 
 	flag.Parse()
+
+	// Проверяем переменную окружения CONFIG
+	if envConfigFile := os.Getenv("CONFIG"); envConfigFile != "" {
+		cfg.ConfigFile = envConfigFile
+	}
+
+	// Загружаем конфигурацию из JSON файла, если указан
+	if cfg.ConfigFile != "" {
+		if err := cfg.loadFromJSON(); err != nil {
+			// Если не удалось загрузить JSON, продолжаем с текущими значениями
+			// (не прерываем работу, как это обычно делается с конфигурацией)
+		}
+	}
 
 	if envServerAddr := os.Getenv("SERVER_ADDRESS"); envServerAddr != "" {
 		cfg.ServerAddress = envServerAddr
@@ -76,4 +102,45 @@ func NewConfig() *Config {
 	}
 
 	return cfg
+}
+
+// loadFromJSON загружает конфигурацию из JSON файла
+// Применяет значения только для тех полей, которые не были установлены флагами или переменными окружения
+func (cfg *Config) loadFromJSON() error {
+	data, err := os.ReadFile(cfg.ConfigFile)
+	if err != nil {
+		return err
+	}
+
+	var jsonCfg JSONConfig
+	if err := json.Unmarshal(data, &jsonCfg); err != nil {
+		return err
+	}
+
+	// Применяем значения из JSON только если они не установлены
+	// (приоритет: флаги > env > JSON > defaults)
+
+	// Для строковых полей проверяем, что они равны значению по умолчанию
+	if cfg.ServerAddress == "localhost:8080" && jsonCfg.ServerAddress != "" {
+		cfg.ServerAddress = jsonCfg.ServerAddress
+	}
+
+	if cfg.BaseURL == "http://localhost:8080/" && jsonCfg.BaseURL != "" {
+		cfg.BaseURL = jsonCfg.BaseURL
+	}
+
+	if cfg.StorageFilePath == defaultStorageFile && jsonCfg.FileStoragePath != "" {
+		cfg.StorageFilePath = jsonCfg.FileStoragePath
+	}
+
+	if cfg.DatabaseDSN == "" && jsonCfg.DatabaseDSN != "" {
+		cfg.DatabaseDSN = jsonCfg.DatabaseDSN
+	}
+
+	// Для булевых полей применяем значение из JSON только если оно true и текущее значение false
+	if !cfg.EnableHTTPS && jsonCfg.EnableHTTPS {
+		cfg.EnableHTTPS = jsonCfg.EnableHTTPS
+	}
+
+	return nil
 }
