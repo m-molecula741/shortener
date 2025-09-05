@@ -132,11 +132,22 @@ func run() error {
 	serverErrChan := make(chan error, 1)
 
 	go func() {
-		logger.Info().
-			Str("address", cfg.ServerAddress).
-			Msg("Starting server")
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			serverErrChan <- fmt.Errorf("server error: %w", err)
+		if cfg.EnableHTTPS {
+			logger.Info().
+				Str("address", cfg.ServerAddress).
+				Str("cert", cfg.CertFile).
+				Str("key", cfg.KeyFile).
+				Msg("Starting HTTPS server")
+			if err := server.ListenAndServeTLS(cfg.CertFile, cfg.KeyFile); err != nil && err != http.ErrServerClosed {
+				serverErrChan <- fmt.Errorf("HTTPS server error: %w", err)
+			}
+		} else {
+			logger.Info().
+				Str("address", cfg.ServerAddress).
+				Msg("Starting HTTP server")
+			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				serverErrChan <- fmt.Errorf("HTTP server error: %w", err)
+			}
 		}
 	}()
 
