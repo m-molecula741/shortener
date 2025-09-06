@@ -126,7 +126,7 @@ func run() error {
 	}
 
 	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	// Канал для передачи ошибок сервера
 	serverErrChan := make(chan error, 1)
