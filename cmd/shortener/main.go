@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -125,8 +126,9 @@ func run() error {
 		Handler: middleware.RequestLogger(httpController),
 	}
 
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	// Создаем контекст с обработкой сигналов завершения
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
 
 	// Канал для передачи ошибок сервера
 	serverErrChan := make(chan error, 1)
@@ -138,14 +140,14 @@ func run() error {
 				Str("cert", cfg.CertFile).
 				Str("key", cfg.KeyFile).
 				Msg("Starting HTTPS server")
-			if err := server.ListenAndServeTLS(cfg.CertFile, cfg.KeyFile); err != nil && err != http.ErrServerClosed {
+			if err := server.ListenAndServeTLS(cfg.CertFile, cfg.KeyFile); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				serverErrChan <- fmt.Errorf("HTTPS server error: %w", err)
 			}
 		} else {
 			logger.Info().
 				Str("address", cfg.ServerAddress).
 				Msg("Starting HTTP server")
-			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				serverErrChan <- fmt.Errorf("HTTP server error: %w", err)
 			}
 		}
@@ -153,7 +155,7 @@ func run() error {
 
 	// Ждем либо сигнал завершения, либо ошибку сервера
 	select {
-	case <-done:
+	case <-ctx.Done():
 		logger.Info().Msg("Received shutdown signal")
 	case err := <-serverErrChan:
 		return err
@@ -161,10 +163,10 @@ func run() error {
 
 	logger.Info().Msg("Server stopped")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Info().
 			Err(err).
 			Msg("Failed to gracefully shutdown the server")

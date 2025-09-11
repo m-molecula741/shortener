@@ -53,7 +53,7 @@ func NewConfig() *Config {
 	flag.Parse()
 
 	// Проверяем переменную окружения CONFIG
-	if envConfigFile := os.Getenv("CONFIG"); envConfigFile != "" {
+	if envConfigFile, exists := os.LookupEnv("CONFIG"); exists && envConfigFile != "" {
 		cfg.ConfigFile = envConfigFile
 	}
 
@@ -66,39 +66,39 @@ func NewConfig() *Config {
 		}
 	}
 
-	if envServerAddr := os.Getenv("SERVER_ADDRESS"); envServerAddr != "" {
+	if envServerAddr, exists := os.LookupEnv("SERVER_ADDRESS"); exists && envServerAddr != "" {
 		cfg.ServerAddress = envServerAddr
 	}
 
-	if envBaseURL := os.Getenv("BASE_URL"); envBaseURL != "" {
+	if envBaseURL, exists := os.LookupEnv("BASE_URL"); exists && envBaseURL != "" {
 		cfg.BaseURL = envBaseURL
 	}
 
-	if envStoragePath := os.Getenv("FILE_STORAGE_PATH"); envStoragePath != "" {
+	if envStoragePath, exists := os.LookupEnv("FILE_STORAGE_PATH"); exists && envStoragePath != "" {
 		cfg.StorageFilePath = envStoragePath
 	}
 
-	if envDatabaseDSN := os.Getenv("DATABASE_DSN"); envDatabaseDSN != "" {
+	if envDatabaseDSN, exists := os.LookupEnv("DATABASE_DSN"); exists && envDatabaseDSN != "" {
 		cfg.DatabaseDSN = envDatabaseDSN
 	}
 
-	if envPprof := os.Getenv("ENABLE_PPROF"); envPprof != "" {
+	if envPprof, exists := os.LookupEnv("ENABLE_PPROF"); exists && envPprof != "" {
 		if enabled, err := strconv.ParseBool(envPprof); err == nil {
 			cfg.EnablePprof = enabled
 		}
 	}
 
-	if envHTTPS := os.Getenv("ENABLE_HTTPS"); envHTTPS != "" {
+	if envHTTPS, exists := os.LookupEnv("ENABLE_HTTPS"); exists && envHTTPS != "" {
 		if enabled, err := strconv.ParseBool(envHTTPS); err == nil {
 			cfg.EnableHTTPS = enabled
 		}
 	}
 
-	if envCertFile := os.Getenv("CERT_FILE"); envCertFile != "" {
+	if envCertFile, exists := os.LookupEnv("CERT_FILE"); exists && envCertFile != "" {
 		cfg.CertFile = envCertFile
 	}
 
-	if envKeyFile := os.Getenv("KEY_FILE"); envKeyFile != "" {
+	if envKeyFile, exists := os.LookupEnv("KEY_FILE"); exists && envKeyFile != "" {
 		cfg.KeyFile = envKeyFile
 	}
 
