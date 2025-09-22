@@ -21,10 +21,10 @@ import (
 
 // HTTPController обрабатывает HTTP запросы к сервису сокращения URL.
 type HTTPController struct {
-	service           URLService
-	router            *chi.Mux
-	auth              *appmiddleware.AuthMiddleware
-	trustedSubnetMW   *appmiddleware.TrustedSubnetMiddleware
+	service         URLService
+	router          *chi.Mux
+	auth            *appmiddleware.AuthMiddleware
+	trustedSubnetMW *appmiddleware.TrustedSubnetMiddleware
 }
 
 // NewHTTPController создает новый экземпляр HTTPController.
@@ -69,7 +69,7 @@ func (c *HTTPController) setupRoutes() {
 	c.router.Get("/ping", c.handlePing)
 	c.router.Get("/api/user/urls", c.handleGetUserURLs)
 	c.router.Delete("/api/user/urls", c.handleDeleteUserURLs)
-	
+
 	// Защищенный эндпоинт для статистики
 	if c.trustedSubnetMW != nil {
 		c.router.With(c.trustedSubnetMW.Handler).Get("/api/internal/stats", c.handleGetStats)
