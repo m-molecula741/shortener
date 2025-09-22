@@ -17,6 +17,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// createTestController создает контроллер с необходимыми зависимостями для тестов
+func createTestController(service URLService) *HTTPController {
+	auth, _ := middleware.NewAuthMiddleware("test-key")
+	trustedSubnetMW, _ := middleware.NewTrustedSubnetMiddleware("192.168.1.0/24")
+	return NewHTTPController(service, auth, trustedSubnetMW)
+}
+
 // MockURLService мок для URLService
 type MockURLService struct {
 	ShortenFunc              func(url string) (string, error)
@@ -27,6 +34,7 @@ type MockURLService struct {
 	ShortenBatchWithUserFunc func(ctx context.Context, requests []usecase.BatchShortenRequest, userID string) ([]usecase.BatchShortenResponse, error)
 	GetUserURLsFunc          func(ctx context.Context, userID string) ([]usecase.UserURL, error)
 	DeleteUserURLsFunc       func(userID string, shortIDs []string) error
+	GetStatsFunc             func(ctx context.Context) (usecase.Stats, error)
 }
 
 func (m *MockURLService) Shorten(url string) (string, error) {
@@ -101,6 +109,13 @@ func (m *MockURLService) DeleteUserURLs(userID string, shortIDs []string) error 
 	return nil
 }
 
+func (m *MockURLService) GetStats(ctx context.Context) (usecase.Stats, error) {
+	if m.GetStatsFunc != nil {
+		return m.GetStatsFunc(ctx)
+	}
+	return usecase.Stats{URLs: 0, Users: 0}, nil
+}
+
 func TestHTTPController_handleShorten(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -159,9 +174,7 @@ func TestHTTPController_handleShorten(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			auth, err := middleware.NewAuthMiddleware("test-key")
-			require.NoError(t, err)
-			controller := NewHTTPController(tt.mockService, auth)
+			controller := createTestController(tt.mockService)
 
 			req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(tt.requestBody))
 			w := httptest.NewRecorder()
@@ -208,9 +221,7 @@ func TestHTTPController_handleRedirect(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			auth, err := middleware.NewAuthMiddleware("test-key")
-			require.NoError(t, err)
-			controller := NewHTTPController(tt.mockService, auth)
+			controller := createTestController(tt.mockService)
 
 			req := httptest.NewRequest(http.MethodGet, "/"+tt.shortID, nil)
 			w := httptest.NewRecorder()
@@ -271,9 +282,7 @@ func TestHandleShortenJSON(t *testing.T) {
 				},
 			}
 
-			auth, err := middleware.NewAuthMiddleware("test-key")
-			require.NoError(t, err)
-			controller := NewHTTPController(mockService, auth)
+			controller := createTestController(mockService)
 
 			reqBody, err := json.Marshal(tt.request)
 			require.NoError(t, err)
@@ -324,9 +333,7 @@ func TestHTTPController_handlePing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			auth, err := middleware.NewAuthMiddleware("test-key")
-			require.NoError(t, err)
-			controller := NewHTTPController(tt.mockService, auth)
+			controller := createTestController(tt.mockService)
 
 			req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 			w := httptest.NewRecorder()
@@ -400,9 +407,7 @@ func TestHTTPController_handleShortenBatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			auth, err := middleware.NewAuthMiddleware("test-key")
-			require.NoError(t, err)
-			controller := NewHTTPController(tt.mockService, auth)
+			controller := createTestController(tt.mockService)
 
 			var body []byte
 			var err2 error
@@ -498,9 +503,9 @@ func TestHTTPController_handleGetUserURLs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			controller := createTestController(tt.mockService)
 			auth, err := middleware.NewAuthMiddleware("test-key")
 			require.NoError(t, err)
-			controller := NewHTTPController(tt.mockService, auth)
 
 			req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
 
@@ -546,11 +551,7 @@ func BenchmarkHandleShorten(b *testing.B) {
 	}
 
 	// Создаем контроллер
-	auth, err := middleware.NewAuthMiddleware("test-key")
-	if err != nil {
-		b.Fatal(err)
-	}
-	controller := NewHTTPController(mockService, auth)
+	controller := createTestController(mockService)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -570,11 +571,7 @@ func BenchmarkHandleShortenJSON(b *testing.B) {
 	}
 
 	// Создаем контроллер
-	auth, err := middleware.NewAuthMiddleware("test-key")
-	if err != nil {
-		b.Fatal(err)
-	}
-	controller := NewHTTPController(mockService, auth)
+	controller := createTestController(mockService)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -595,11 +592,7 @@ func BenchmarkHandleRedirect(b *testing.B) {
 	}
 
 	// Создаем контроллер
-	auth, err := middleware.NewAuthMiddleware("test-key")
-	if err != nil {
-		b.Fatal(err)
-	}
-	controller := NewHTTPController(mockService, auth)
+	controller := createTestController(mockService)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -628,11 +621,7 @@ func BenchmarkHandleShortenBatch(b *testing.B) {
 	}
 
 	// Создаем контроллер
-	auth, err := middleware.NewAuthMiddleware("test-key")
-	if err != nil {
-		b.Fatal(err)
-	}
-	controller := NewHTTPController(mockService, auth)
+	controller := createTestController(mockService)
 
 	// Подготавливаем тестовые данные
 	requests := []usecase.BatchShortenRequest{
@@ -671,11 +660,7 @@ func BenchmarkHandleGetUserURLs(b *testing.B) {
 	}
 
 	// Создаем контроллер
-	auth, err := middleware.NewAuthMiddleware("test-key")
-	if err != nil {
-		b.Fatal(err)
-	}
-	controller := NewHTTPController(mockService, auth)
+	controller := createTestController(mockService)
 
 	// Создаем тестовую куку
 	cookie := &http.Cookie{

@@ -171,3 +171,19 @@ func (s *InMemoryStorage) BatchDeleteUserURLs(ctx context.Context, userID string
 
 	return nil
 }
+
+// GetStats возвращает статистику сервиса
+func (s *InMemoryStorage) GetStats(ctx context.Context) (usecase.Stats, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var stats usecase.Stats
+
+	// Количество URL в памяти
+	stats.URLs = len(s.urls)
+
+	// Количество уникальных пользователей
+	stats.Users = len(s.users)
+
+	return stats, nil
+}

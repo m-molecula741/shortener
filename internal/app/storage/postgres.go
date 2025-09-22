@@ -230,3 +230,24 @@ func (s *PostgresStorage) BatchDeleteUserURLs(ctx context.Context, userID string
 
 	return nil
 }
+
+// GetStats возвращает статистику сервиса
+func (s *PostgresStorage) GetStats(ctx context.Context) (usecase.Stats, error) {
+	var stats usecase.Stats
+
+	// Получаем количество URL (не удаленных)
+	urlQuery := `SELECT COUNT(*) FROM urls WHERE is_deleted = FALSE`
+	err := s.pool.QueryRow(ctx, urlQuery).Scan(&stats.URLs)
+	if err != nil {
+		return stats, fmt.Errorf("failed to get URLs count: %w", err)
+	}
+
+	// Получаем количество уникальных пользователей (только те, у кого есть URL)
+	userQuery := `SELECT COUNT(DISTINCT user_id) FROM urls WHERE user_id IS NOT NULL AND is_deleted = FALSE`
+	err = s.pool.QueryRow(ctx, userQuery).Scan(&stats.Users)
+	if err != nil {
+		return stats, fmt.Errorf("failed to get users count: %w", err)
+	}
+
+	return stats, nil
+}
