@@ -18,6 +18,7 @@ type MockURLStorage struct {
 	SaveBatchFunc           func(ctx context.Context, urls []URLPair) error
 	GetUserURLsFunc         func(ctx context.Context, userID string) ([]UserURL, error)
 	BatchDeleteUserURLsFunc func(ctx context.Context, userID string, shortIDs []string) error
+	GetStatsFunc            func(ctx context.Context) (Stats, error)
 	SaveBatchCallCount      int
 	LastSavedBatch          []URLPair
 }
@@ -57,6 +58,13 @@ func (m *MockURLStorage) BatchDeleteUserURLs(ctx context.Context, userID string,
 		return m.BatchDeleteUserURLsFunc(ctx, userID, shortIDs)
 	}
 	return nil
+}
+
+func (m *MockURLStorage) GetStats(ctx context.Context) (Stats, error) {
+	if m.GetStatsFunc != nil {
+		return m.GetStatsFunc(ctx)
+	}
+	return Stats{URLs: 0, Users: 0}, nil
 }
 
 // MockDatabasePinger мок для DatabasePinger

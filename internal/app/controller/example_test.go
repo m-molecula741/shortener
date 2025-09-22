@@ -14,6 +14,13 @@ import (
 	"github.com/m-molecula741/shortener/internal/app/usecase"
 )
 
+// Helper function to create controller with all required dependencies
+func createTestController(service controller.URLService) *controller.HTTPController {
+	auth, _ := middleware.NewAuthMiddleware("test-key")
+	trustedSubnetMW, _ := middleware.NewTrustedSubnetMiddleware("192.168.1.0/24")
+	return controller.NewHTTPController(service, auth, trustedSubnetMW)
+}
+
 // Пример сокращения URL через JSON API
 func Example_shortenURL() {
 	// Создаем мок сервиса
@@ -24,8 +31,7 @@ func Example_shortenURL() {
 	}
 
 	// Создаем контроллер
-	auth, _ := middleware.NewAuthMiddleware("test-key")
-	ctrl := controller.NewHTTPController(mockService, auth)
+	ctrl := createTestController(mockService)
 
 	// Создаем тестовый сервер
 	ts := httptest.NewServer(ctrl)
@@ -62,8 +68,7 @@ func Example_getUserURLs() {
 	}
 
 	// Создаем контроллер
-	auth, _ := middleware.NewAuthMiddleware("test-key")
-	ctrl := controller.NewHTTPController(mockService, auth)
+	ctrl := createTestController(mockService)
 
 	// Создаем тестовый сервер
 	ts := httptest.NewServer(ctrl)
@@ -101,8 +106,7 @@ func Example_shortenURLPlainText() {
 	}
 
 	// Создаем контроллер
-	auth, _ := middleware.NewAuthMiddleware("test-key")
-	ctrl := controller.NewHTTPController(mockService, auth)
+	ctrl := createTestController(mockService)
 
 	// Создаем тестовый сервер
 	ts := httptest.NewServer(ctrl)
@@ -141,8 +145,7 @@ func Example_batchShorten() {
 	}
 
 	// Создаем контроллер
-	auth, _ := middleware.NewAuthMiddleware("test-key")
-	ctrl := controller.NewHTTPController(mockService, auth)
+	ctrl := createTestController(mockService)
 
 	// Создаем тестовый сервер
 	ts := httptest.NewServer(ctrl)
@@ -181,8 +184,7 @@ func Example_getOriginalURL() {
 	}
 
 	// Создаем контроллер
-	auth, _ := middleware.NewAuthMiddleware("test-key")
-	ctrl := controller.NewHTTPController(mockService, auth)
+	ctrl := createTestController(mockService)
 
 	// Создаем тестовый сервер
 	ts := httptest.NewServer(ctrl)
@@ -216,8 +218,7 @@ func Example_deleteUserURLs() {
 	}
 
 	// Создаем контроллер
-	auth, _ := middleware.NewAuthMiddleware("test-key")
-	ctrl := controller.NewHTTPController(mockService, auth)
+	ctrl := createTestController(mockService)
 
 	// Создаем тестовый сервер
 	ts := httptest.NewServer(ctrl)
@@ -257,8 +258,7 @@ func Example_pingService() {
 	}
 
 	// Создаем контроллер
-	auth, _ := middleware.NewAuthMiddleware("test-key")
-	ctrl := controller.NewHTTPController(mockService, auth)
+	ctrl := createTestController(mockService)
 
 	// Создаем тестовый сервер
 	ts := httptest.NewServer(ctrl)
@@ -283,6 +283,7 @@ type MockURLService struct {
 	PingDBFunc               func() error
 	DeleteUserURLsFunc       func(userID string, shortIDs []string) error
 	ShortenBatchWithUserFunc func(ctx context.Context, requests []usecase.BatchShortenRequest, userID string) ([]usecase.BatchShortenResponse, error)
+	GetStatsFunc             func(ctx context.Context) (usecase.Stats, error)
 }
 
 func (m *MockURLService) Shorten(url string) (string, error) {
@@ -333,4 +334,11 @@ func (m *MockURLService) DeleteUserURLs(userID string, shortIDs []string) error 
 		return m.DeleteUserURLsFunc(userID, shortIDs)
 	}
 	return nil
+}
+
+func (m *MockURLService) GetStats(ctx context.Context) (usecase.Stats, error) {
+	if m.GetStatsFunc != nil {
+		return m.GetStatsFunc(ctx)
+	}
+	return usecase.Stats{URLs: 0, Users: 0}, nil
 }

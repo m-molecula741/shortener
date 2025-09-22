@@ -17,4 +17,5 @@ type URLService interface {
 	ShortenBatchWithUser(ctx context.Context, requests []usecase.BatchShortenRequest, userID string) ([]usecase.BatchShortenResponse, error)
 	GetUserURLs(ctx context.Context, userID string) ([]usecase.UserURL, error)
 	DeleteUserURLs(userID string, shortIDs []string) error
+	GetStats(ctx context.Context) (usecase.Stats, error)
 }

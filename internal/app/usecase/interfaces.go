@@ -10,6 +10,7 @@ type URLStorage interface {
 	SaveBatch(ctx context.Context, urls []URLPair) error
 	GetUserURLs(ctx context.Context, userID string) ([]UserURL, error)
 	BatchDeleteUserURLs(ctx context.Context, userID string, shortIDs []string) error
+	GetStats(ctx context.Context) (Stats, error)
 }
 
 // DatabasePinger определяет интерфейс для проверки соединения с базой данных

@@ -20,6 +20,7 @@ type JSONConfig struct {
 	FileStoragePath string `json:"file_storage_path"`
 	DatabaseDSN     string `json:"database_dsn"`
 	EnableHTTPS     bool   `json:"enable_https"`
+	TrustedSubnet   string `json:"trusted_subnet"`
 }
 
 // Config представляет конфигурацию приложения
@@ -33,6 +34,7 @@ type Config struct {
 	CertFile        string // путь к файлу сертификата
 	KeyFile         string // путь к файлу ключа
 	ConfigFile      string // путь к файлу конфигурации JSON
+	TrustedSubnet   string // доверенная подсеть в формате CIDR
 }
 
 // NewConfig создает новую конфигурацию
@@ -49,6 +51,7 @@ func NewConfig() *Config {
 	flag.StringVar(&cfg.KeyFile, "key", "server.key", "path to key file")
 	flag.StringVar(&cfg.ConfigFile, "c", "", "path to JSON config file")
 	flag.StringVar(&cfg.ConfigFile, "config", "", "path to JSON config file")
+	flag.StringVar(&cfg.TrustedSubnet, "t", "", "trusted subnet in CIDR format")
 
 	flag.Parse()
 
@@ -102,6 +105,10 @@ func NewConfig() *Config {
 		cfg.KeyFile = envKeyFile
 	}
 
+	if envTrustedSubnet, exists := os.LookupEnv("TRUSTED_SUBNET"); exists && envTrustedSubnet != "" {
+		cfg.TrustedSubnet = envTrustedSubnet
+	}
+
 	return cfg
 }
 
@@ -141,6 +148,10 @@ func (cfg *Config) loadFromJSON() error {
 	// Для булевых полей применяем значение из JSON только если оно true и текущее значение false
 	if !cfg.EnableHTTPS && jsonCfg.EnableHTTPS {
 		cfg.EnableHTTPS = jsonCfg.EnableHTTPS
+	}
+
+	if cfg.TrustedSubnet == "" && jsonCfg.TrustedSubnet != "" {
+		cfg.TrustedSubnet = jsonCfg.TrustedSubnet
 	}
 
 	return nil

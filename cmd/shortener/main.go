@@ -119,7 +119,14 @@ func run() error {
 
 	urlService := usecase.NewURLService(store, cfg.BaseURL, dbPinger)
 	var service controller.URLService = urlService
-	httpController := controller.NewHTTPController(service, auth)
+	
+	// Создаем middleware для проверки доверенной подсети
+	trustedSubnetMW, err := middleware.NewTrustedSubnetMiddleware(cfg.TrustedSubnet)
+	if err != nil {
+		return fmt.Errorf("failed to initialize trusted subnet middleware: %w", err)
+	}
+	
+	httpController := controller.NewHTTPController(service, auth, trustedSubnetMW)
 
 	server := &http.Server{
 		Addr:    cfg.ServerAddress,
