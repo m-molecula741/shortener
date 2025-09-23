@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package shortener;
+
+option go_package = "github.com/m-molecula741/shortener/internal/app/grpc/pb";
+
+// Сервис сокращения URL
+service URLShortener {
+  // Сокращение URL (аналог POST /)
+  rpc ShortenURL(ShortenURLRequest) returns (ShortenURLResponse);
+  
+  // Сокращение URL в JSON формате (аналог POST /api/shorten)
+  rpc ShortenURLJSON(ShortenURLJSONRequest) returns (ShortenURLJSONResponse);
+  
+  // Получение оригинального URL (аналог GET /{shortID})
+  rpc ExpandURL(ExpandURLRequest) returns (ExpandURLResponse);
+  
+  // Пакетное сокращение URL (аналог POST /api/shorten/batch)
+  rpc ShortenBatch(ShortenBatchRequest) returns (ShortenBatchResponse);
+  
+  // Получение URL пользователя (аналог GET /api/user/urls)
+  rpc GetUserURLs(GetUserURLsRequest) returns (GetUserURLsResponse);
+  
+  // Удаление URL пользователя (аналог DELETE /api/user/urls)
+  rpc DeleteUserURLs(DeleteUserURLsRequest) returns (DeleteUserURLsResponse);
+  
+  // Проверка работоспособности (аналог GET /ping)
+  rpc Ping(PingRequest) returns (PingResponse);
+  
+  // Получение статистики (аналог GET /api/internal/stats)
+  rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
+}
+
+// Запрос на сокращение URL (текстовый формат)
+message ShortenURLRequest {
+  string url = 1;
+  string user_id = 2; // Передается через metadata
+}
+
+// Ответ на сокращение URL (текстовый формат)
+message ShortenURLResponse {
+  string short_url = 1;
+}
+
+// Запрос на сокращение URL (JSON формат)
+message ShortenURLJSONRequest {
+  string url = 1;
+  string user_id = 2; // Передается через metadata
+}
+
+// Ответ на сокращение URL (JSON формат)
+message ShortenURLJSONResponse {
+  string result = 1;
+}
+
+// Запрос на получение оригинального URL
+message ExpandURLRequest {
+  string short_id = 1;
+}
+
+// Ответ на получение оригинального URL
+message ExpandURLResponse {
+  string original_url = 1;
+}
+
+// Элемент пакетного запроса
+message BatchShortenItem {
+  string correlation_id = 1;
+  string original_url = 2;
+}
+
+// Элемент пакетного ответа
+message BatchShortenResponseItem {
+  string correlation_id = 1;
+  string short_url = 2;
+}
+
+// Запрос на пакетное сокращение URL
+message ShortenBatchRequest {
+  repeated BatchShortenItem items = 1;
+  string user_id = 2; // Передается через metadata
+}
+
+// Ответ на пакетное сокращение URL
+message ShortenBatchResponse {
+  repeated BatchShortenResponseItem items = 1;
+}
+
+// URL пользователя
+message UserURL {
+  string short_url = 1;
+  string original_url = 2;
+}
+
+// Запрос на получение URL пользователя
+message GetUserURLsRequest {
+  string user_id = 1; // Передается через metadata
+}
+
+// Ответ на получение URL пользователя
+message GetUserURLsResponse {
+  repeated UserURL urls = 1;
+}
+
+// Запрос на удаление URL пользователя
+message DeleteUserURLsRequest {
+  repeated string short_ids = 1;
+  string user_id = 2; // Передается через metadata
+}
+
+// Ответ на удаление URL пользователя
+message DeleteUserURLsResponse {
+  bool success = 1;
+}
+
+// Запрос на проверку работоспособности
+message PingRequest {
+}
+
+// Ответ на проверку работоспособности
+message PingResponse {
+  bool healthy = 1;
+}
+
+// Запрос на получение статистики
+message GetStatsRequest {
+}
+
+// Ответ на получение статистики
+message GetStatsResponse {
+  int32 urls = 1;  // количество сокращённых URL в сервисе
+  int32 users = 2; // количество пользователей в сервисе
+}

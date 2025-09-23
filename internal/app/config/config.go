@@ -21,6 +21,8 @@ type JSONConfig struct {
 	DatabaseDSN     string `json:"database_dsn"`
 	EnableHTTPS     bool   `json:"enable_https"`
 	TrustedSubnet   string `json:"trusted_subnet"`
+	GRPCAddress     string `json:"grpc_address"`
+	EnableGRPC      bool   `json:"enable_grpc"`
 }
 
 // Config представляет конфигурацию приложения
@@ -35,6 +37,8 @@ type Config struct {
 	KeyFile         string // путь к файлу ключа
 	ConfigFile      string // путь к файлу конфигурации JSON
 	TrustedSubnet   string // доверенная подсеть в формате CIDR
+	GRPCAddress     string // адрес gRPC-сервера
+	EnableGRPC      bool   // включить gRPC сервер
 }
 
 // NewConfig создает новую конфигурацию
@@ -52,6 +56,8 @@ func NewConfig() *Config {
 	flag.StringVar(&cfg.ConfigFile, "c", "", "path to JSON config file")
 	flag.StringVar(&cfg.ConfigFile, "config", "", "path to JSON config file")
 	flag.StringVar(&cfg.TrustedSubnet, "t", "", "trusted subnet in CIDR format")
+	flag.StringVar(&cfg.GRPCAddress, "g", "localhost:3200", "gRPC server address")
+	flag.BoolVar(&cfg.EnableGRPC, "grpc", true, "enable gRPC server")
 
 	flag.Parse()
 
@@ -109,6 +115,16 @@ func NewConfig() *Config {
 		cfg.TrustedSubnet = envTrustedSubnet
 	}
 
+	if envGRPCAddress, exists := os.LookupEnv("GRPC_ADDRESS"); exists && envGRPCAddress != "" {
+		cfg.GRPCAddress = envGRPCAddress
+	}
+
+	if envEnableGRPC, exists := os.LookupEnv("ENABLE_GRPC"); exists && envEnableGRPC != "" {
+		if enabled, err := strconv.ParseBool(envEnableGRPC); err == nil {
+			cfg.EnableGRPC = enabled
+		}
+	}
+
 	return cfg
 }
 
@@ -152,6 +168,14 @@ func (cfg *Config) loadFromJSON() error {
 
 	if cfg.TrustedSubnet == "" && jsonCfg.TrustedSubnet != "" {
 		cfg.TrustedSubnet = jsonCfg.TrustedSubnet
+	}
+
+	if cfg.GRPCAddress == "localhost:3200" && jsonCfg.GRPCAddress != "" {
+		cfg.GRPCAddress = jsonCfg.GRPCAddress
+	}
+
+	if !cfg.EnableGRPC && jsonCfg.EnableGRPC {
+		cfg.EnableGRPC = jsonCfg.EnableGRPC
 	}
 
 	return nil
