@@ -331,3 +331,8 @@ func (s *URLService) ShortenBatchWithUser(ctx context.Context, requests []BatchS
 func (s *URLService) GetUserURLs(ctx context.Context, userID string) ([]UserURL, error) {
 	return s.storage.GetUserURLs(ctx, userID)
 }
+
+// GetStats получает статистику сервиса
+func (s *URLService) GetStats(ctx context.Context) (Stats, error) {
+	return s.storage.GetStats(ctx)
+}

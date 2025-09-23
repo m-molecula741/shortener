@@ -21,17 +21,19 @@ import (
 
 // HTTPController обрабатывает HTTP запросы к сервису сокращения URL.
 type HTTPController struct {
-	service URLService
-	router  *chi.Mux
-	auth    *appmiddleware.AuthMiddleware
+	service         URLService
+	router          *chi.Mux
+	auth            *appmiddleware.AuthMiddleware
+	trustedSubnetMW *appmiddleware.TrustedSubnetMiddleware
 }
 
 // NewHTTPController создает новый экземпляр HTTPController.
-func NewHTTPController(service URLService, auth *appmiddleware.AuthMiddleware) *HTTPController {
+func NewHTTPController(service URLService, auth *appmiddleware.AuthMiddleware, trustedSubnetMW *appmiddleware.TrustedSubnetMiddleware) *HTTPController {
 	c := &HTTPController{
-		service: service,
-		router:  chi.NewRouter(),
-		auth:    auth,
+		service:         service,
+		router:          chi.NewRouter(),
+		auth:            auth,
+		trustedSubnetMW: trustedSubnetMW,
 	}
 	c.setupRoutes()
 	return c
@@ -67,6 +69,11 @@ func (c *HTTPController) setupRoutes() {
 	c.router.Get("/ping", c.handlePing)
 	c.router.Get("/api/user/urls", c.handleGetUserURLs)
 	c.router.Delete("/api/user/urls", c.handleDeleteUserURLs)
+
+	// Защищенный эндпоинт для статистики
+	if c.trustedSubnetMW != nil {
+		c.router.With(c.trustedSubnetMW.Handler).Get("/api/internal/stats", c.handleGetStats)
+	}
 }
 
 // ServeHTTP реализует интерфейс http.Handler.
@@ -321,4 +328,24 @@ func (c *HTTPController) handleDeleteUserURLs(w http.ResponseWriter, r *http.Req
 	}
 
 	w.WriteHeader(http.StatusAccepted)
+}
+
+// @Summary Получение статистики сервиса
+// @Description Возвращает количество сокращенных URL и пользователей. Доступ только из доверенной подсети.
+// @Tags Internal
+// @Produce json
+// @Success 200 {object} usecase.Stats "Статистика сервиса"
+// @Failure 403 {string} string "Доступ запрещен"
+// @Failure 500 {string} string "Внутренняя ошибка сервера"
+// @Router /api/internal/stats [get]
+func (c *HTTPController) handleGetStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := c.service.GetStats(r.Context())
+	if err != nil {
+		http.Error(w, "Failed to get stats", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(stats)
 }

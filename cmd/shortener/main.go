@@ -9,11 +9,13 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/m-molecula741/shortener/internal/app/config"
 	"github.com/m-molecula741/shortener/internal/app/controller"
+	grpcserver "github.com/m-molecula741/shortener/internal/app/grpc"
 	"github.com/m-molecula741/shortener/internal/app/logger"
 	"github.com/m-molecula741/shortener/internal/app/middleware"
 	"github.com/m-molecula741/shortener/internal/app/storage"
@@ -119,21 +121,41 @@ func run() error {
 
 	urlService := usecase.NewURLService(store, cfg.BaseURL, dbPinger)
 	var service controller.URLService = urlService
-	httpController := controller.NewHTTPController(service, auth)
+
+	// Создаем middleware для проверки доверенной подсети
+	trustedSubnetMW, err := middleware.NewTrustedSubnetMiddleware(cfg.TrustedSubnet)
+	if err != nil {
+		return fmt.Errorf("failed to initialize trusted subnet middleware: %w", err)
+	}
+
+	httpController := controller.NewHTTPController(service, auth, trustedSubnetMW)
 
 	server := &http.Server{
 		Addr:    cfg.ServerAddress,
 		Handler: middleware.RequestLogger(httpController),
 	}
 
+	// Создаем gRPC сервер
+	var grpcSrv *grpcserver.GRPCServer
+	if cfg.EnableGRPC {
+		grpcSrv = grpcserver.NewGRPCServer(service, auth, trustedSubnetMW)
+		logger.Info().
+			Str("address", cfg.GRPCAddress).
+			Msg("gRPC server will be started")
+	}
+
 	// Создаем контекст с обработкой сигналов завершения
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 
-	// Канал для передачи ошибок сервера
-	serverErrChan := make(chan error, 1)
+	// Каналы для передачи ошибок серверов
+	var wg sync.WaitGroup
+	serverErrChan := make(chan error, 2) // Для HTTP и gRPC серверов
 
+	// Запускаем HTTP сервер
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		if cfg.EnableHTTPS {
 			logger.Info().
 				Str("address", cfg.ServerAddress).
@@ -153,6 +175,20 @@ func run() error {
 		}
 	}()
 
+	// Запускаем gRPC сервер если включен
+	if cfg.EnableGRPC && grpcSrv != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			logger.Info().
+				Str("address", cfg.GRPCAddress).
+				Msg("Starting gRPC server")
+			if err := grpcserver.StartServer(cfg.GRPCAddress, grpcSrv); err != nil {
+				serverErrChan <- fmt.Errorf("gRPC server error: %w", err)
+			}
+		}()
+	}
+
 	// Ждем либо сигнал завершения, либо ошибку сервера
 	select {
 	case <-ctx.Done():
@@ -161,15 +197,32 @@ func run() error {
 		return err
 	}
 
-	logger.Info().Msg("Server stopped")
+	logger.Info().Msg("Shutting down servers...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	// Завершаем HTTP сервер
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Info().
 			Err(err).
-			Msg("Failed to gracefully shutdown the server")
+			Msg("Failed to gracefully shutdown HTTP server")
+	}
+
+	// gRPC сервер завершается автоматически при завершении горутины
+	// Ждем завершения всех горутин серверов
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	// Ждем завершения всех серверов или таймаут
+	select {
+	case <-shutdownCtx.Done():
+		logger.Info().Msg("Shutdown timeout exceeded")
+	case <-done:
+		logger.Info().Msg("All servers stopped")
 	}
 
 	// Закрываем сервис удаления URL
